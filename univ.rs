@@ -1,7 +1,6 @@
-extern crate sdl;
+extern crate sdl2;
 
 use std::io::timer::sleep;
-use sdl::video::{set_video_mode, HWSurface, DoubleBuf, RGB, Surface};
 
 static WIDTH: int = 1024;
 static HEIGHT: int = 768;
@@ -23,14 +22,14 @@ struct Vector {
 }
 
 
-fn force(p1: Particle, p2:Particle) -> Vector {
+fn force(p1: &Particle, p2: &Particle) -> Vector {
     let disp = diff(p1.pos, p2.pos);
     let dist = modls(disp);
     let f = p1.mass * p2.mass / (dist + EPS); // force magnitude
     Vector { x: f*dist/disp.x, y: f*dist/disp.y }
 }
 
-fn step(&mut m: Particle, &mut M: Particle) {
+fn step(m: &mut Particle, M: &mut Particle) {
     // assume M doesn't change
     // update positions
     m.pos.x = m.pos.x + m.vel.x;
@@ -41,15 +40,15 @@ fn step(&mut m: Particle, &mut M: Particle) {
     m.vel.y += f.y/m.mass*DT;
 }
 
-fn dot(v1: &Vector, v2: &Vector) -> f64 {
+fn dot(v1: Vector, v2: Vector) -> f64 {
     v1.x * v2.x + v1.y * v2.y
 }
 
-fn modls(v : &Vector) -> f64 {
+fn modls(v : Vector) -> f64 {
     (v.x * v.x + v.y* v.y).sqrt()
 }
 
-fn diff(v1 : &Vector, v2: &Vector) -> Vector {
+fn diff(v1 : Vector, v2: Vector) -> Vector {
     Vector { x: v1.x - v2.x, y: v1.y -v2.y }
 }
 
@@ -75,24 +74,29 @@ fn fill_circle(screen: &Surface, x: f64, y: f64, r:f64, col:RGB) {
 */
 
 fn main() {
-    sdl::init([sdl::InitVideo]);
-    sdl::wm::set_caption("Universe", "What is this argument?");
+    sdl2::init(sdl2::InitVideo);
 
-
-    let screen = match set_video_mode( WIDTH, HEIGHT, COLDEPTH, [HWSurface], [DoubleBuf]) {
-        Ok(screen) => screen,
-        Err(err) => fail!("failed to set video mode: {}", err) 
+    let window = match sdl2::video::Window::new("Univ", sdl2::video::PosCentered, sdl2::video::PosCentered, WIDTH, HEIGHT, sdl2::video::OpenGL) {
+        Ok(window) => window,
+        Err(err) => fail!(format!("failed to create window: {}", err))
     };
 
-    let mut m1 = Particle { pos:Vector {x: 1, y: 1}, vel:Vector {x:0,y:0}, mass:1 };
-    let mut m2 = Particle { pos:Vector {x:-1, y:-1}, vel:Vector {x:0,y:0}, mass:1 };
+    let renderer = match sdl2::render::Renderer::from_window(window, sdl2::render::DriverAuto, sdl2::render::Accelerated) {
+        Ok(renderer) => renderer,
+        Err(err) => fail!(format!("failed to create renderer: {}", err))
+    };
 
-    for x in range(0u16, 100) {
-        screen.fill_rect(Some(rect), RGB(255,255,255));
-        screen.flip();
+    for x in range(0u8, 255) {
+        renderer.set_draw_color(sdl2::pixels::RGB(x, 255-x, 0));
+        renderer.clear();
+        renderer.present();
         sleep(10);
     }
 
-    sdl::quit();
+    sdl2::quit();
+
+    //let mut m1 = Particle { pos:Vector {x: 1, y: 1}, vel:Vector {x:0,y:0}, mass:1 };
+    //let mut m2 = Particle { pos:Vector {x:-1, y:-1}, vel:Vector {x:0,y:0}, mass:1 };
+
 }
 

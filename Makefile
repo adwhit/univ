@@ -1,6 +1,6 @@
-SDLDIR = "lib/rust-sdl2"
-SDLLIB = "$(SDLDIR)/build/lib/libsdl2-79c1f430-0.0.1.rlib"
-FLAGS = "-O"
+SDLDIR = lib/rust-sdl2
+SDLLIB = $(SDLDIR)/build/lib/
+FLAGS =  -O
 
 all: univ
 
