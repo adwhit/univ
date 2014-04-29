@@ -1,6 +1,12 @@
 SDLDIR = "lib/rust-sdl"
 SDLSRC = "$(SDLDIR)/src/sdl/lib.rs"
 SDLLIB = "libsdl-e351513a-0.3.2.rlib" 
+FLAGS = "-O"
+
+all: univ
+
+univ: univ.rs 
+	rustc $< -o $@ -L $(SDLDIR) $(FLAGS)
 
 dep:$(SDLDIR)/$(SDLLIB)
 
@@ -14,5 +20,7 @@ lib/rust-sdl:
 
 depclean:
 	rm -rf lib
+
+
 
 .PHONY: dep distclean
