@@ -1,28 +1,25 @@
-SDLDIR = "lib/rust-sdl"
-SDLSRC = "$(SDLDIR)/src/sdl/lib.rs"
-SDLLIB = "libsdl-e351513a-0.3.2.rlib" 
+SDLDIR = "lib/rust-sdl2"
+SDLLIB = "$(SDLDIR)/build/lib/libsdl2-79c1f430-0.0.1.rlib"
 FLAGS = "-O"
 
 all: univ
 
 univ: univ.rs 
-	rustc $< -o $@ -L $(SDLDIR) $(FLAGS)
+	rustc $< -o $@ -L $(SDLLIB) $(FLAGS)
 
-dep:$(SDLDIR)/$(SDLLIB)
+dep:$(SDLLIB)
 
-$(SDLDIR)/$(SDLLIB): lib/rust-sdl
-	rustc $(SDLSRC) -O --out-dir $(SDLDIR)
+$(SDLLIB): $(SDLDIR)
+	cd $(SDLDIR); make
 
-lib/rust-sdl: 
+$(SDLDIR):
 	mkdir -p lib
-	cd lib; git clone http://github.com/brson/rust-sdl; \
-		cd rust-sdl; git checkout 804adf6
+	cd lib; git clone http://github.com/AngryLawyer/rust-sdl2
 
 depclean:
 	rm -rf lib
 
 clean:
 	rm univ
-
 
 .PHONY: dep distclean clean
