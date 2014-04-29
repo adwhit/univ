@@ -21,6 +21,8 @@ lib/rust-sdl:
 depclean:
 	rm -rf lib
 
+clean:
+	rm univ
 
 
-.PHONY: dep distclean
+.PHONY: dep distclean clean
