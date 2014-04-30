@@ -5,12 +5,13 @@ use std::io::timer::sleep;
 use sdl2::rect::Point;
 use sdl2::pixels::{RGB, RGBA};
 use rand::random;
+use std::f64;
 
 static WIDTH: int = 1024;
 static HEIGHT: int = 768;
 static COLDEPTH: int = 32;
 static FPS: int = 60;
-static DT: f64 = 0.1;
+static DT: f64 = 0.05;
 static EPS: f64 = 0.1;
 
 struct Particle {
@@ -35,14 +36,6 @@ fn force(p1: &Particle, p2: &Particle) -> Vector {
 fn steppos(m: &mut Particle) {
     m.pos.x = m.pos.x + m.vel.x*DT;
     m.pos.y = m.pos.y + m.vel.y*DT;
-}
-
-fn stepvel(m1: &mut Particle, m2: &mut Particle) {
-    let f = force(m1, m2);
-    m1.vel.x += f.x/m1.mass*DT;
-    m1.vel.y += f.y/m1.mass*DT;
-    m2.vel.x -= f.x/m2.mass*DT;
-    m2.vel.y -= f.y/m2.mass*DT;
 }
 
 fn dot(v1: Vector, v2: Vector) -> f64 {
@@ -74,49 +67,77 @@ fn circle_points(x: f64, y: f64, r:f64) -> ~[Point] {
     points
 }
 
-fn animate() {
-    sdl2::init(sdl2::InitVideo);
+fn make_galaxy() -> ~[Particle] {
+    let mut particles: ~[Particle] = ~[];
+    let pi =  f64::consts::PI;
+    let ns = [20,  50,   100,  150,  200];
+    let rs = [50., 100., 200., 250., 300.];
+    let velweight = 400.0;
 
+    for (&n, &r) in ns.iter().zip(rs.iter()) {
+        for i in std::iter::range_inclusive(1, n) {
+            let theta = (i as f64)/(n as f64)*2.0*pi;
+            let vel = velweight*(1.0/r).sqrt();
+            particles.push(Particle {pos:Vector {x: r*theta.cos(),   y: r*theta.sin()  }, 
+                                     vel:Vector {x: vel*theta.sin(), y: -vel*theta.cos()},
+                                     mass:1. });
+        }
+    }
+    //central particle
+    particles.push(Particle {pos:Vector {x: 0., y: 0.  }, 
+                             vel:Vector {x: 0., y: 0.}, mass:1000. });
+    particles
+}
+
+fn initwindow() -> ~sdl2::render::Renderer {
+    sdl2::init(sdl2::InitVideo);
     let window = match sdl2::video::Window::new("Univ", sdl2::video::PosCentered, sdl2::video::PosCentered, WIDTH, HEIGHT, sdl2::video::OpenGL) {
         Ok(window) => window,
         Err(err) => fail!(format!("failed to create window: {}", err))
     };
-
     let renderer = match sdl2::render::Renderer::from_window(window, sdl2::render::DriverAuto, sdl2::render::Accelerated) {
         Ok(renderer) => renderer,
         Err(err) => fail!(format!("failed to create renderer: {}", err))
     };
+    renderer
+}
 
-    let mut particles: ~[Particle] = ~[];
-    for _ in range (0, 200) {
-        let rnd1 = random::<int>() % 100;
-        let rnd2 = random::<int>() % 100;
-        particles.push(Particle { pos:Vector {x: rnd1 as f64, y: rnd2 as f64}, vel:Vector {x:0.,y:0.}, mass:1. });
+fn stepvel(force: Vector, p: &mut Particle, sense:bool) {
+    if sense {
+        p.vel.x += force.x/p.mass*DT;
+        p.vel.y += force.y/p.mass*DT;
+    } else {
+        p.vel.x -= force.x/p.mass*DT;
+        p.vel.y -= force.y/p.mass*DT;
     }
-    let lenp = particles.len();
+}
 
+
+fn animate() {
+
+    let renderer = initwindow();
+    let mut particles = make_galaxy();
+
+    let lenp = particles.len();
     let midx = (WIDTH/2) as f64;
     let midy = (HEIGHT/2) as f64;
+    let m2sz = 5.0;
 
-    let mut colct = 0;
-    let mut inc = true;
+
     renderer.clear();
     loop {
+        renderer.set_draw_color(RGB(0,0,0));
+        renderer.clear();
         for (ix,p) in particles.iter().enumerate() {
-            renderer.set_draw_color(RGB(colct+ix as u8 ,255-colct,0));
-            renderer.draw_points(circle_points(p.pos.x+midx, p.pos.y+midy, p.mass*10.).as_slice());
+            renderer.set_draw_color(RGB(255,255,255));
+            renderer.draw_points(circle_points(p.pos.x+midx, p.pos.y+midy, (m2sz*p.mass.powf(&0.333)).sqrt()).as_slice());
         }
-        if inc { colct += 1 } else { colct -= 1 };
-        if colct >= 200 { inc = false };
-        if colct <= 0 { inc = true };
         for i in range(0, lenp) {
             for j in range(i+1, lenp) {
                 if i != j {
-                    let f = force(&particles[i], &particles[j]);
-                    particles[i].vel.x += f.x/particles[i].mass*DT;
-                    particles[i].vel.y += f.y/particles[i].mass*DT;
-                    particles[j].vel.x -= f.x/particles[j].mass*DT;
-                    particles[j].vel.y -= f.y/particles[j].mass*DT;
+                    let mut f = force(&particles[i], &particles[j]);
+                    stepvel(f, &mut particles[i], true);
+                    stepvel(f, &mut particles[j], false);
                 }
             }
         }
@@ -140,18 +161,3 @@ fn animate() {
 fn main() {
     animate()
 }
-/*
-    let mut p1 = Particle { pos:Vector {x: 100., y: 0.}, vel:Vector {x:0.,y:0.}, mass:1. };
-    let mut p2 = Particle { pos:Vector {x:-100., y: 0.}, vel:Vector {x:0.,y:0.}, mass:1. };
-
-    let midx = (WIDTH/2) as f64;
-    let midy = (HEIGHT/2) as f64;
-
-    for _ in range(0,10) {
-        step(&mut p1, &p2);
-        step(&mut p2, &p1);
-        println!("P1:{:?}    P2: {:?}", p1, p2);
-    }
-}
-
-*/
