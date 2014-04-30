@@ -7,11 +7,10 @@ use sdl2::pixels::{RGB, RGBA};
 use rand::random;
 use std::f64;
 
-static WIDTH: int = 1024;
-static HEIGHT: int = 768;
-static COLDEPTH: int = 32;
+static WIDTH: i32 = 1024;
+static HEIGHT: i32 = 768;
 static FPS: int = 60;
-static DT: f64 = 0.05;
+static DT: f64 = 0.1;
 static EPS: f64 = 0.1;
 
 struct Particle {
@@ -72,6 +71,8 @@ fn make_galaxy() -> ~[Particle] {
     let pi =  f64::consts::PI;
     let ns = [20,  50,   100,  150,  200];
     let rs = [50., 100., 200., 250., 300.];
+    //let ns = [20,  100,   200];
+    //let rs = [50., 200.,  300.];
     let velweight = 400.0;
 
     for (&n, &r) in ns.iter().zip(rs.iter()) {
@@ -89,19 +90,6 @@ fn make_galaxy() -> ~[Particle] {
     particles
 }
 
-fn initwindow() -> ~sdl2::render::Renderer {
-    sdl2::init(sdl2::InitVideo);
-    let window = match sdl2::video::Window::new("Univ", sdl2::video::PosCentered, sdl2::video::PosCentered, WIDTH, HEIGHT, sdl2::video::OpenGL) {
-        Ok(window) => window,
-        Err(err) => fail!(format!("failed to create window: {}", err))
-    };
-    let renderer = match sdl2::render::Renderer::from_window(window, sdl2::render::DriverAuto, sdl2::render::Accelerated) {
-        Ok(renderer) => renderer,
-        Err(err) => fail!(format!("failed to create renderer: {}", err))
-    };
-    renderer
-}
-
 fn stepvel(force: Vector, p: &mut Particle, sense:bool) {
     if sense {
         p.vel.x += force.x/p.mass*DT;
@@ -112,37 +100,38 @@ fn stepvel(force: Vector, p: &mut Particle, sense:bool) {
     }
 }
 
+fn stepsim(particles: &mut [Particle], lenp: uint) {
+    for i in range(0, lenp) {
+        for j in range(i+1, lenp) {
+            if i != j {
+                let mut f = force(&particles[i], &particles[j]);
+                stepvel(f, &mut particles[i], true);
+                stepvel(f, &mut particles[j], false);
+            }
+        }
+    }
+    for p in particles.mut_iter() {
+        steppos(p);
+    }
+}
 
 fn animate() {
-
-    let renderer = initwindow();
+    let renderer = get_renderer();
     let mut particles = make_galaxy();
-
     let lenp = particles.len();
     let midx = (WIDTH/2) as f64;
     let midy = (HEIGHT/2) as f64;
     let m2sz = 5.0;
 
-
     renderer.clear();
     loop {
         renderer.set_draw_color(RGB(0,0,0));
         renderer.clear();
-        for (ix,p) in particles.iter().enumerate() {
+        stepsim(particles, lenp);
+        for p in particles.iter() {
             renderer.set_draw_color(RGB(255,255,255));
-            renderer.draw_points(circle_points(p.pos.x+midx, p.pos.y+midy, (m2sz*p.mass.powf(&0.333)).sqrt()).as_slice());
-        }
-        for i in range(0, lenp) {
-            for j in range(i+1, lenp) {
-                if i != j {
-                    let mut f = force(&particles[i], &particles[j]);
-                    stepvel(f, &mut particles[i], true);
-                    stepvel(f, &mut particles[j], false);
-                }
-            }
-        }
-        for p in particles.mut_iter() {
-            steppos(p);
+            //renderer.draw_points(circle_points(p.pos.x+midx, p.pos.y+midy, (m2sz*p.mass.powf(&0.333)).sqrt()).as_slice());
+            renderer.draw_point(Point { x:p.pos.x as i32 + WIDTH/2, y:p.pos.y as i32 + HEIGHT/2 } );
         }
         renderer.present();
         match sdl2::event::poll_event() {
@@ -158,6 +147,38 @@ fn animate() {
     sdl2::quit();
 }
 
+fn get_renderer() -> ~sdl2::render::Renderer {
+    sdl2::render::Renderer::new_with_window(1000, 1000, sdl2::video::FullscreenDesktop).unwrap()
+}
+
+
+fn bitmappy() {
+    let renderer = get_renderer();
+    renderer.clear();
+    let bmp = match sdl2::surface::Surface::from_bmp(&std::path::Path::new("lib/LAND3.BMP")) {
+        Ok(bmap) =>  bmap,
+        Err(e)   => fail!(e)
+    };
+    let tex = match renderer.create_texture_from_surface(bmp) {
+        Ok(t) => t,
+        Err(e) => fail!(e)
+    };
+    renderer.copy(tex, None, Some(sdl2::rect::Rect::new(100,100,100,100)));
+    renderer.present();
+    loop {
+        match sdl2::event::poll_event() {
+            sdl2::event::QuitEvent(_) => break,
+            sdl2::event::KeyDownEvent(_, _, key, _, _) => {
+                if key == sdl2::keycode::EscapeKey {
+                    break
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
 fn main() {
-    animate()
+    //bitmappy();
+    animate();
 }
