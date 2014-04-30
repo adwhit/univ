@@ -3,6 +3,7 @@ extern crate rand;
 
 use std::io::timer::sleep;
 use sdl2::rect::Point;
+use sdl2::pixels::{RGB, RGBA};
 use rand::random;
 
 static WIDTH: int = 1024;
@@ -87,7 +88,7 @@ fn animate() {
     };
 
     let mut particles: ~[Particle] = ~[];
-    for x in range (0, 200) {
+    for _ in range (0, 200) {
         let rnd1 = random::<int>() % 100;
         let rnd2 = random::<int>() % 100;
         particles.push(Particle { pos:Vector {x: rnd1 as f64, y: rnd2 as f64}, vel:Vector {x:0.,y:0.}, mass:1. });
@@ -97,11 +98,17 @@ fn animate() {
     let midx = (WIDTH/2) as f64;
     let midy = (HEIGHT/2) as f64;
 
+    let mut colct = 0;
+    let mut inc = true;
+    renderer.clear();
     loop {
-        renderer.clear();
-        for p in particles.iter() {
+        for (ix,p) in particles.iter().enumerate() {
+            renderer.set_draw_color(RGB(colct+ix as u8 ,255-colct,0));
             renderer.draw_points(circle_points(p.pos.x+midx, p.pos.y+midy, p.mass*10.).as_slice());
         }
+        if inc { colct += 1 } else { colct -= 1 };
+        if colct >= 200 { inc = false };
+        if colct <= 0 { inc = true };
         for i in range(0, lenp) {
             for j in range(i+1, lenp) {
                 if i != j {
