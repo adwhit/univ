@@ -131,23 +131,40 @@ fn pcls2pixel(particles: &[Particle]) -> ~[u8] {
     arr
 }
 
+fn pcls2points(particles: &[Particle]) -> ~[Point] {
+    let midx = (WIDTH/2) as f64;
+    let midy = (HEIGHT/2) as f64;
+    let mut arr: ~[Point] = ~[];
+    for p in particles.iter() {
+        arr.push(Point {x: (p.pos.x + midx) as i32, y: (p.pos.y + midy) as i32 })
+    }
+    arr
+}
+
 fn animate() {
+    //This is pretty mangled - half way through trying to create tails
+    //by combining textures with alpha-transparancy
     let renderer = get_renderer();
     let mut particles = make_galaxy();
     let lenp = particles.len();
+    //create mask
     let mask = renderer.create_texture(sdl2::pixels::RGB888,
                                        sdl2::render::AccessStreaming,WIDTH as int,HEIGHT as int).unwrap();
-    let newframe = renderer.create_texture(sdl2::pixels::RGB888,
+    let base = renderer.create_texture(sdl2::pixels::RGB888,
                                        sdl2::render::AccessStreaming,WIDTH as int,HEIGHT as int).unwrap();
-    mask.set_blend_mode(sdl2::render::BlendBlend);
-    mask.set_alpha_mod(10);
+    let pixels : ~[u8] = ~[0,..NBYTES*WIDTH*HEIGHT];
+    mask.update(None, pixels, (WIDTH * NBYTES) as int);
+    mask.set_blend_mode(sdl2::render::BlendNone);
+    mask.set_alpha_mod(100);
 
     renderer.clear();
     loop {
-        let pixels = pcls2pixel(particles);
-        mask.update(None, pixels, (WIDTH * NBYTES) as int);
-        renderer.copy(mask,None,None);
         stepsim(particles, lenp);
+        let points = pcls2points(particles);
+        mask.update(None, pcls2pixel(particles), (WIDTH*NBYTES) as int);
+        renderer.copy(mask,None,None);
+        //renderer.draw_points(points);
+        renderer.draw_line(Point::new(1,2),Point::new(30, 50));
         renderer.present();
         match sdl2::event::poll_event() {
             sdl2::event::QuitEvent(_) => break,
@@ -163,7 +180,7 @@ fn animate() {
 }
 
 fn get_renderer() -> ~sdl2::render::Renderer {
-    sdl2::render::Renderer::new_with_window(1000, 1000, sdl2::video::FullscreenDesktop).unwrap()
+    sdl2::render::Renderer::new_with_window(WIDTH as int, HEIGHT as int, sdl2::video::FullscreenDesktop).unwrap()
 }
 
 
