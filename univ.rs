@@ -7,11 +7,12 @@ use sdl2::pixels::{RGB, RGBA};
 use rand::random;
 use std::f64;
 
-static WIDTH: i32 = 1024;
-static HEIGHT: i32 = 768;
+static WIDTH: uint = 1024;
+static HEIGHT: uint = 768;
 static FPS: int = 60;
 static DT: f64 = 0.1;
 static EPS: f64 = 0.1;
+static NBYTES: uint = 4;
 
 struct Particle {
     pos : Vector,
@@ -71,8 +72,6 @@ fn make_galaxy() -> ~[Particle] {
     let pi =  f64::consts::PI;
     let ns = [20,  50,   100,  150,  200];
     let rs = [50., 100., 200., 250., 300.];
-    //let ns = [20,  100,   200];
-    //let rs = [50., 200.,  300.];
     let velweight = 400.0;
 
     for (&n, &r) in ns.iter().zip(rs.iter()) {
@@ -115,24 +114,40 @@ fn stepsim(particles: &mut [Particle], lenp: uint) {
     }
 }
 
+fn pcls2pixel(particles: &[Particle]) -> ~[u8] {
+    let mut arr : ~[u8] = ~[0,..NBYTES*WIDTH*HEIGHT];
+    let midx = (WIDTH/2) as f64;
+    let midy = (HEIGHT/2) as f64;
+    for p in particles.iter() {
+        let xind = (p.pos.x + midx) as uint;
+        let yind = (p.pos.y + midy) as uint;
+        if xind < WIDTH && yind < HEIGHT {
+            let ix = NBYTES * ((yind * WIDTH) + xind);
+            arr[ix] = 0xff;
+            arr[ix+1] = 0xff;
+            arr[ix+2] = 0xff;
+        }
+    }
+    arr
+}
+
 fn animate() {
     let renderer = get_renderer();
     let mut particles = make_galaxy();
     let lenp = particles.len();
-    let midx = (WIDTH/2) as f64;
-    let midy = (HEIGHT/2) as f64;
-    let m2sz = 5.0;
+    let mask = renderer.create_texture(sdl2::pixels::RGB888,
+                                       sdl2::render::AccessStreaming,WIDTH as int,HEIGHT as int).unwrap();
+    let newframe = renderer.create_texture(sdl2::pixels::RGB888,
+                                       sdl2::render::AccessStreaming,WIDTH as int,HEIGHT as int).unwrap();
+    mask.set_blend_mode(sdl2::render::BlendBlend);
+    mask.set_alpha_mod(10);
 
     renderer.clear();
     loop {
-        renderer.set_draw_color(RGB(0,0,0));
-        renderer.clear();
+        let pixels = pcls2pixel(particles);
+        mask.update(None, pixels, (WIDTH * NBYTES) as int);
+        renderer.copy(mask,None,None);
         stepsim(particles, lenp);
-        for p in particles.iter() {
-            renderer.set_draw_color(RGB(255,255,255));
-            //renderer.draw_points(circle_points(p.pos.x+midx, p.pos.y+midy, (m2sz*p.mass.powf(&0.333)).sqrt()).as_slice());
-            renderer.draw_point(Point { x:p.pos.x as i32 + WIDTH/2, y:p.pos.y as i32 + HEIGHT/2 } );
-        }
         renderer.present();
         match sdl2::event::poll_event() {
             sdl2::event::QuitEvent(_) => break,
