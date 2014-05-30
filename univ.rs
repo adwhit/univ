@@ -50,8 +50,8 @@ fn diff(v1 : Vector, v2: Vector) -> Vector {
     Vector { x: v1.x - v2.x, y: v1.y -v2.y }
 }
 
-fn circle_points(x: f64, y: f64, r:f64) -> ~[Point] {
-    let mut points: ~[Point] = ~[];
+fn circle_points(x: f64, y: f64, r:f64) -> Vec<Point> {
+    let mut points: Vec<Point> = Vec::new();
     let rr = r as i32;
     let xr = x as i32;
     let yr = y as i32;
@@ -67,8 +67,8 @@ fn circle_points(x: f64, y: f64, r:f64) -> ~[Point] {
     points
 }
 
-fn make_galaxy() -> ~[Particle] {
-    let mut particles: ~[Particle] = ~[];
+fn make_galaxy() -> Vec<Particle> {
+    let mut particles: Vec<Particle> = Vec::new();
     let pi =  f64::consts::PI;
     let ns = [20,  50,   100,  150,  200];
     let rs = [50., 100., 200., 250., 300.];
@@ -99,13 +99,13 @@ fn stepvel(force: Vector, p: &mut Particle, sense:bool) {
     }
 }
 
-fn stepsim(particles: &mut [Particle], lenp: uint) {
+fn stepsim(particles: &mut Vec<Particle>, lenp: uint) {
     for i in range(0, lenp) {
         for j in range(i+1, lenp) {
             if i != j {
-                let mut f = force(&particles[i], &particles[j]);
-                stepvel(f, &mut particles[i], true);
-                stepvel(f, &mut particles[j], false);
+                let mut f = force(particles.get(i), particles.get(j));
+                stepvel(f, particles.get_mut(i), true);
+                stepvel(f, particles.get_mut(j), false);
             }
         }
     }
@@ -114,7 +114,7 @@ fn stepsim(particles: &mut [Particle], lenp: uint) {
     }
 }
 
-fn pcls2pixel(particles: &[Particle]) -> ~[u8] {
+fn pcls2pixel(particles: &Vec<Particle>) -> ~[u8] {
     let mut arr : ~[u8] = ~[0,..NBYTES*WIDTH*HEIGHT];
     let midx = (WIDTH/2) as f64;
     let midy = (HEIGHT/2) as f64;
@@ -131,10 +131,10 @@ fn pcls2pixel(particles: &[Particle]) -> ~[u8] {
     arr
 }
 
-fn pcls2points(particles: &[Particle]) -> ~[Point] {
+fn pcls2points(particles: &Vec<Particle>) -> Vec<Point> {
     let midx = (WIDTH/2) as f64;
     let midy = (HEIGHT/2) as f64;
-    let mut arr: ~[Point] = ~[];
+    let mut arr: Vec<Point> = Vec::new();
     for p in particles.iter() {
         arr.push(Point {x: (p.pos.x + midx) as i32, y: (p.pos.y + midy) as i32 })
     }
@@ -159,10 +159,10 @@ fn animate() {
 
     renderer.clear();
     loop {
-        stepsim(particles, lenp);
-        let points = pcls2points(particles);
-        mask.update(None, pcls2pixel(particles), (WIDTH*NBYTES) as int);
-        renderer.copy(mask,None,None);
+        stepsim(&mut particles, lenp);
+        let points = pcls2points(&particles);
+        mask.update(None, pcls2pixel(&particles), (WIDTH*NBYTES) as int);
+        renderer.copy(&mask,None,None);
         //renderer.draw_points(points);
         renderer.draw_line(Point::new(1,2),Point::new(30, 50));
         renderer.present();
@@ -179,7 +179,7 @@ fn animate() {
     sdl2::quit();
 }
 
-fn get_renderer() -> ~sdl2::render::Renderer {
+fn get_renderer() -> sdl2::render::Renderer<sdl2::video::Window> {
     sdl2::render::Renderer::new_with_window(WIDTH as int, HEIGHT as int, sdl2::video::FullscreenDesktop).unwrap()
 }
 
@@ -191,11 +191,11 @@ fn bitmappy() {
         Ok(bmap) =>  bmap,
         Err(e)   => fail!(e)
     };
-    let tex = match renderer.create_texture_from_surface(bmp) {
+    let tex = match renderer.create_texture_from_surface(&bmp) {
         Ok(t) => t,
         Err(e) => fail!(e)
     };
-    renderer.copy(tex, None, Some(sdl2::rect::Rect::new(100,100,100,100)));
+    renderer.copy(&tex, None, Some(sdl2::rect::Rect::new(100,100,100,100)));
     renderer.present();
     loop {
         match sdl2::event::poll_event() {
