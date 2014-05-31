@@ -7,8 +7,8 @@ use sdl2::pixels::{RGB, RGBA};
 use rand::random;
 use std::f64;
 
-static WIDTH: uint = 1024;
-static HEIGHT: uint = 768;
+static WIDTH: uint = 2048;
+static HEIGHT: uint = 1400;
 static FPS: int = 60;
 static DT: f64 = 0.1;
 static EPS: f64 = 0.;
@@ -82,8 +82,10 @@ fn make_galaxy() -> Vec<Particle> {
     let mut particles: Vec<Particle> = Vec::new();
     let pi =  f64::consts::PI;
     // n planets at radius r
-    let ns = [20,  50,   100,  150,  200];
-    let rs = [50., 100., 200., 250., 300.];
+    //let ns = [20,  50,   100,  150,  200];
+    //let rs = [50., 100., 200., 250., 300.];
+    let ns = [50];
+    let rs = [100.];
     //parameter to weight velocities
     let velweight = 400.0;
 
@@ -105,15 +107,28 @@ fn make_galaxy() -> Vec<Particle> {
 }
 
 fn init_velocity(particles: &mut Vec<Particle>) {
+    let mut vels : Vec<Vector> = Vec::new();
+    let weight = 1.;
     for p in particles.iter() {
-        let r = modls(p.pos);
         let mut tot_force = Vector {x : 0., y: 0.};
         for q in particles.iter() {
             if q != p {
                 tot_force.add(&force(p, q))
             }
         }
-        //p.vel = tot_force;
+        let r = modls(p.pos);
+
+        let mut v = Vector { x: (tot_force.y.abs()*r/p.mass).sqrt()*weight,
+                         y: (tot_force.x.abs()*r/p.mass).sqrt()*weight} ;
+        if tot_force.x < 0. { v.y *= -1. };
+        if tot_force.y > 0. { v.x *= -1. };
+        vels.push(v);
+        println!("pos x:{} fx:{} vel y:{} pos y:{} fy:{} vel x:{} tot_v:{}", p.pos.x, tot_force.x,v.y, p.pos.y, tot_force.y,v.x,modls(v));
+
+        // f = m*v*v/r -> v = (f*r/m).sqrt()
+    }
+    for (p,&v) in particles.mut_iter().zip(vels.iter()) {
+        p.vel  = v;
     }
 }
 
@@ -196,6 +211,7 @@ fn animate() {
     //by combining textures with alpha-transparancy
     let renderer = get_renderer();
     let mut particles = make_galaxy();
+    init_velocity(&mut particles);
     let lenp = particles.len();
     //create mask
     let mask = renderer.create_texture(sdl2::pixels::RGB888,
