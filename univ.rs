@@ -101,8 +101,8 @@ fn make_galaxy() -> Vec<Particle> {
         }
     }
     //central particle
-    particles.push(Particle {pos:Vector {x: 0., y: 0.  }, 
-                             vel:Vector {x: 0., y: 0.}, mass:1000. });
+    //particles.push(Particle {pos:Vector {x: 0., y: 0.  }, 
+    //                         vel:Vector {x: 0., y: 0.}, mass:1000. });
     particles
 }
 
@@ -124,8 +124,6 @@ fn init_velocity(particles: &mut Vec<Particle>) {
         if tot_force.y > 0. { v.x *= -1. };
         vels.push(v);
         println!("pos x:{} fx:{} vel y:{} pos y:{} fy:{} vel x:{} tot_v:{}", p.pos.x, tot_force.x,v.y, p.pos.y, tot_force.y,v.x,modls(v));
-
-        // f = m*v*v/r -> v = (f*r/m).sqrt()
     }
     for (p,&v) in particles.mut_iter().zip(vels.iter()) {
         p.vel  = v;
