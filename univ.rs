@@ -27,6 +27,11 @@ struct Vector {
     y : f64
 }
 
+enum Galaxy {
+    Random,
+    Circular
+}
+
 impl Vector {
     fn add(&mut self, other: &Vector) {
         self.x += other.x;
@@ -98,7 +103,7 @@ fn circle_points(x: f64, y: f64, r:f64) -> Vec<Point> {
     points
 }
 
-fn make_circular_galaxy(num_stars: int, max_radius: f64) -> Vec<Particle> {
+fn spawn_circular_galaxy(max_radius: f64, num_stars: int) -> Vec<Particle> {
     let mut particles: Vec<Particle> = Vec::new();
     let pi =  f64::consts::PI;
     // n planets at radius r
@@ -116,13 +121,10 @@ fn make_circular_galaxy(num_stars: int, max_radius: f64) -> Vec<Particle> {
                                      mass:1. });
         }
     }
-    //central particle
-    particles.push(Particle {pos:Vector {x: 0., y: 0.  }, 
-                             vel:Vector {x: 0., y: 0.}, mass:10000. });
     particles
 }
 
-fn make_random_galaxy(radius: f64, num_stars: int) -> Vec<Particle> {
+fn spawn_random_galaxy(radius: f64, num_stars: int) -> Vec<Particle> {
     let mut particles: Vec<Particle> = Vec::new();
     for i in range(0,num_stars) {
         let theta = rand::random::<f64>()*360.;
@@ -133,13 +135,28 @@ fn make_random_galaxy(radius: f64, num_stars: int) -> Vec<Particle> {
                                  vel:Vector {x: 0., y: 0.},
                                  mass:1. });
     }
-    //central particle
-    particles.push(Particle {pos:Vector {x: 0., y: 0.  }, 
-                             vel:Vector {x: 0., y: 0.}, mass:10000. });
     particles
 }
 
-fn init_velocity(particles: &mut Vec<Particle>) {
+fn offset(particles: &mut Vec<Particle>, central_pcl: &Particle) {
+    for p in particles.mut_iter() {
+        p.pos.add(&central_pcl.pos);
+        p.vel.add(&central_pcl.vel);
+    }
+}
+
+fn make_galaxy(shape: Galaxy, central_pcl : Particle, radius: f64, num_stars: int) -> Vec<Particle> {
+    let mut particles = match shape {
+        Random => spawn_random_galaxy(radius, num_stars),
+        Circular => spawn_circular_galaxy(radius, num_stars)
+    };
+    init_velocity(&mut particles, &central_pcl);
+    offset(&mut particles, &central_pcl);
+    particles.push(central_pcl);
+    particles
+}
+
+fn init_velocity(particles: &mut Vec<Particle>, central_pcl: &Particle) {
     let mut vels : Vec<Vector> = Vec::new();
     let weight = 1.;
     for p in particles.iter() {
@@ -149,6 +166,7 @@ fn init_velocity(particles: &mut Vec<Particle>) {
                 forcev.add(&force(p, q))
             }
         }
+        forcev.add(&force(p, central_pcl));
         let theta = p.pos.angle();
         let speed = (forcev.modulus()*p.pos.modulus()/p.mass).sqrt();
         if theta.is_nan() {
@@ -158,8 +176,6 @@ fn init_velocity(particles: &mut Vec<Particle>) {
             let v = Vector {x: speed*theta.sin(), y: -speed*theta.cos()};
             vels.push(v);
         }
-        //println!("pos x:{:0.2f} fx:{:0.2f} vel y:{:0.2f} pos y:{:0.2f} fy:{:0.2f} vel x:{:0.2f} tot_v:{:0.2f}",
-        //p.pos.x, forcev.x,v.y, p.pos.y, forcev.y,v.x,v.modulus());
     }
     for (p,&v) in particles.mut_iter().zip(vels.iter()) {
         p.vel  = v;
@@ -167,7 +183,7 @@ fn init_velocity(particles: &mut Vec<Particle>) {
 }
 
 //Calculates particle with equivalent centre of mass and total mass
-fn centre_of_mass(particles: Vec<Particle>) -> Particle {
+fn centre_of_mass(particles: &Vec<Particle>) -> Particle {
     //position
     let mut rx = 0.;
     let mut ry = 0.;
@@ -241,43 +257,34 @@ fn pcls2points(particles: &Vec<Particle>) -> Vec<Point> {
 }
 
 fn animate() {
-    //This is pretty mangled - half way through trying to create tails
-    //by combining textures with alpha-transparancy
     let renderer = get_renderer();
-    //let mut particles = make_random_galaxy(500., 1000);
-    let mut particles = make_circular_galaxy(1000, 200.);
-    init_velocity(&mut particles);
+
+    let centre1 = Particle { pos: Vector {x: -200., y:-200.},
+                         vel: Vector {x: 0., y:0.},
+                         mass: 10000.};
+    let centre2 = Particle { pos: Vector {x: 0., y:0.},
+                         vel: Vector {x: 10., y:10.},
+                         mass: 1000.};
+    let mut particles = make_galaxy(Circular, centre1, 400., 100);
+    let galaxy2 = make_galaxy(Circular, centre2, 400., 1000);
+    
+    print_state(&particles);
+
     let lenp = particles.len();
     let mut framect = 0;
-    //create mask
-    //let mask = renderer.create_texture(sdl2::pixels::RGB888,
-    //                                   sdl2::render::AccessStreaming,WIDTH as int,HEIGHT as int).unwrap();
-    //let base = renderer.create_texture(sdl2::pixels::RGB888,
-    //                                   sdl2::render::AccessStreaming,WIDTH as int,HEIGHT as int).unwrap();
     let pixels : ~[u8] = ~[0,..NBYTES*WIDTH*HEIGHT];
-    //mask.update(None, pixels, (WIDTH * NBYTES) as int);
-    //mask.set_blend_mode(sdl2::render::BlendNone);
-    //mask.set_alpha_mod(100);
 
     renderer.clear();
     loop {
         renderer.clear();
         stepsim(&mut particles, lenp);
         let points = pcls2points(&particles);
-        //mask.update(None, pcls2pixel(&particles), (WIDTH*NBYTES) as int);
-        //renderer.copy(&mask,None,None);
         renderer.draw_points(points.as_slice());
-        //renderer.draw_line(Point::new(1,2),Point::new(30, 50));
-        framect += 1;
         if framect % 10 ==0 {
             //println!("{} : {}", time::now().ctime(), framect);
-            let mut ke = 0.;
-            for p in particles.iter() {
-                ke += p.kinetic_energy()
-            }
-            println!("KE: {}", ke)
         }
         renderer.present();
+        framect += 1;
         match sdl2::event::poll_event() {
             sdl2::event::QuitEvent(_) => break,
             sdl2::event::KeyDownEvent(_, _, key, _, _) => {
@@ -289,23 +296,30 @@ fn animate() {
         }
     }
     sdl2::quit();
+    print_state(&particles);
 }
 
 fn get_renderer() -> sdl2::render::Renderer<sdl2::video::Window> {
     sdl2::render::Renderer::new_with_window(WIDTH as int, HEIGHT as int, sdl2::video::FullscreenDesktop).unwrap()
 }
 
+fn total_ke(particles: &Vec<Particle>) -> f64 {
+    let mut ke = 0.;
+    for p in particles.iter() {
+        ke += p.kinetic_energy()
+    }
+    ke
+}
+
+fn print_state(particles: &Vec<Particle>) {
+    for &p in particles.iter() {
+        println!("x: {:0.2f}\ty: {:0.2f}\t xv: {:0.2f}\t yv: {:0.2f}\tr: {:0.2f}\tv {:0.2f}", 
+                p.pos.x, p.pos.y, p.vel.x, p.vel.y, p.pos.modulus(), p.vel.modulus())
+    }
+    println!("KE: {:0.2f}", total_ke(particles));
+}
+
 
 fn main() {
     animate();
-}
-
-fn testtan() {
-    let pi = f64::consts::PI;
-    let xs = [1., -1., -1., 1.];
-    let ys = [2., 2., -2., -2.];
-    for (&x, &y) in xs.iter().zip(ys.iter()) {
-        let v = Vector {x: x, y: y};
-        println!("x {} y {} theta {}", x, y, v.angle()*180./pi)
-    }
 }
