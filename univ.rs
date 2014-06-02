@@ -1,27 +1,27 @@
 extern crate sdl2;
-extern crate rand;
+extern crate time;
 
 use std::io::timer::sleep;
 use sdl2::rect::Point;
 use sdl2::pixels::{RGB, RGBA};
-use rand::random;
+use std::rand;
 use std::f64;
 
 static WIDTH: uint = 2048;
 static HEIGHT: uint = 1400;
 static FPS: int = 60;
-static DT: f64 = 0.1;
+static DT: f64 = 0.05;
 static EPS: f64 = 0.;
 static NBYTES: uint = 4;
 
-#[deriving(Eq)]
+#[deriving(PartialEq)]
 struct Particle {
     pos : Vector,
     vel : Vector,
     mass: f64
 }
 
-#[deriving(Eq)]
+#[deriving(PartialEq)]
 struct Vector {
     x : f64,
     y : f64
@@ -32,13 +32,26 @@ impl Vector {
         self.x += other.x;
         self.y += other.y;
     }
+
+    fn dot(&self, other: &Vector) -> f64 {
+    self.x * other.x + self.y * other.y
+    }
+
+    fn modulus(&self) -> f64 {
+        (self.x * self.x + self.y* self.y).sqrt()
+    }
+
+    //vector pointing from v1 towards v2
+    fn diff(&self, v2: Vector) -> Vector {
+        Vector { x: v2.x - self.x, y: v2.y -self.y }
+    }
 }
 
 
 //force is calculated as pointing from particle 1 towards particle 2
 fn force(p1: &Particle, p2: &Particle) -> Vector {
-    let disp = diff(p1.pos, p2.pos);
-    let dist = modls(disp) + EPS;
+    let disp = p1.pos.diff(p2.pos);
+    let dist = disp.modulus() + EPS;
     let f = p1.mass * p2.mass / dist; // force magnitude
     Vector { x: f*disp.x/dist, y: f*disp.y/dist }
 }
@@ -48,18 +61,6 @@ fn steppos(m: &mut Particle) {
     m.pos.y = m.pos.y + m.vel.y*DT;
 }
 
-fn dot(v1: Vector, v2: Vector) -> f64 {
-    v1.x * v2.x + v1.y * v2.y
-}
-
-fn modls(v : Vector) -> f64 {
-    (v.x * v.x + v.y* v.y).sqrt()
-}
-
-//vector pointing from v1 towards v2
-fn diff(v1 : Vector, v2: Vector) -> Vector {
-    Vector { x: v2.x - v1.x, y: v2.y -v1.y }
-}
 
 fn circle_points(x: f64, y: f64, r:f64) -> Vec<Point> {
     let mut points: Vec<Point> = Vec::new();
@@ -78,31 +79,44 @@ fn circle_points(x: f64, y: f64, r:f64) -> Vec<Point> {
     points
 }
 
-fn make_galaxy() -> Vec<Particle> {
+fn make_circular_galaxy() -> Vec<Particle> {
     let mut particles: Vec<Particle> = Vec::new();
     let pi =  f64::consts::PI;
     // n planets at radius r
-    //let ns = [20,  50,   100,  150,  200];
-    //let rs = [50., 100., 200., 250., 300.];
-    let ns = [50];
-    let rs = [100.];
-    //parameter to weight velocities
-    let velweight = 400.0;
-
+    //let ns = [20,  500,   100,  150,  200];
+    //let rs = [50., 100., 400., 250., 300.];
+    let ns = [500, 1000];
+    let rs = [50., 100.];
+    //let ns = [50];
+    //let rs = [100.];
     for (&n, &r) in ns.iter().zip(rs.iter()) {
         for i in std::iter::range_inclusive(1, n) {
             let theta = (i as f64)/(n as f64)*2.0*pi;
-            //XXX want to change to make universe stable
-            let vel = velweight*(1.0/r).sqrt();
             particles.push(Particle {pos:Vector {x: r*theta.cos(),   y: r*theta.sin()  }, 
-                                     //vel:Vector {x: 0., y: 0.},
-                                     vel:Vector {x: vel*theta.sin(), y: -vel*theta.cos()},
+                                     vel:Vector {x: 0., y: 0.},
                                      mass:1. });
         }
     }
     //central particle
+    particles.push(Particle {pos:Vector {x: 0., y: 0.  }, 
+                             vel:Vector {x: 0., y: 0.}, mass:10000. });
+    particles
+}
+
+fn make_random_galaxy(radius: f64, num_stars: int) -> Vec<Particle> {
+    let mut particles: Vec<Particle> = Vec::new();
+    for i in range(0,num_stars) {
+        let theta = rand::random::<f64>()*360.;
+        let r = rand::random::<f64>()*radius;
+        let x =  r*theta.cos();
+        let y =  r*theta.sin();
+        particles.push(Particle {pos:Vector {x: x,  y: y },
+                                 vel:Vector {x: 0., y: 0.},
+                                 mass:1. });
+    }
+    //central particle
     //particles.push(Particle {pos:Vector {x: 0., y: 0.  }, 
-    //                         vel:Vector {x: 0., y: 0.}, mass:1000. });
+                             //vel:Vector {x: 0., y: 0.}, mass:10000. });
     particles
 }
 
@@ -112,18 +126,18 @@ fn init_velocity(particles: &mut Vec<Particle>) {
     for p in particles.iter() {
         let mut tot_force = Vector {x : 0., y: 0.};
         for q in particles.iter() {
-            if q != p {
+            if q.pos != p.pos {
                 tot_force.add(&force(p, q))
             }
         }
-        let r = modls(p.pos);
+        let r = p.pos.modulus();
 
         let mut v = Vector { x: (tot_force.y.abs()*r/p.mass).sqrt()*weight,
                          y: (tot_force.x.abs()*r/p.mass).sqrt()*weight} ;
         if tot_force.x < 0. { v.y *= -1. };
         if tot_force.y > 0. { v.x *= -1. };
         vels.push(v);
-        println!("pos x:{} fx:{} vel y:{} pos y:{} fy:{} vel x:{} tot_v:{}", p.pos.x, tot_force.x,v.y, p.pos.y, tot_force.y,v.x,modls(v));
+        println!("pos x:{} fx:{} vel y:{} pos y:{} fy:{} vel x:{} tot_v:{}", p.pos.x, tot_force.x,v.y, p.pos.y, tot_force.y,v.x,v.modulus());
     }
     for (p,&v) in particles.mut_iter().zip(vels.iter()) {
         p.vel  = v;
@@ -208,18 +222,19 @@ fn animate() {
     //This is pretty mangled - half way through trying to create tails
     //by combining textures with alpha-transparancy
     let renderer = get_renderer();
-    let mut particles = make_galaxy();
+    let mut particles = make_random_galaxy(500., 1000);
     init_velocity(&mut particles);
     let lenp = particles.len();
+    let mut framect = 0;
     //create mask
-    let mask = renderer.create_texture(sdl2::pixels::RGB888,
-                                       sdl2::render::AccessStreaming,WIDTH as int,HEIGHT as int).unwrap();
-    let base = renderer.create_texture(sdl2::pixels::RGB888,
-                                       sdl2::render::AccessStreaming,WIDTH as int,HEIGHT as int).unwrap();
+    //let mask = renderer.create_texture(sdl2::pixels::RGB888,
+    //                                   sdl2::render::AccessStreaming,WIDTH as int,HEIGHT as int).unwrap();
+    //let base = renderer.create_texture(sdl2::pixels::RGB888,
+    //                                   sdl2::render::AccessStreaming,WIDTH as int,HEIGHT as int).unwrap();
     let pixels : ~[u8] = ~[0,..NBYTES*WIDTH*HEIGHT];
-    mask.update(None, pixels, (WIDTH * NBYTES) as int);
-    mask.set_blend_mode(sdl2::render::BlendNone);
-    mask.set_alpha_mod(100);
+    //mask.update(None, pixels, (WIDTH * NBYTES) as int);
+    //mask.set_blend_mode(sdl2::render::BlendNone);
+    //mask.set_alpha_mod(100);
 
     renderer.clear();
     loop {
@@ -230,6 +245,10 @@ fn animate() {
         //renderer.copy(&mask,None,None);
         renderer.draw_points(points.as_slice());
         //renderer.draw_line(Point::new(1,2),Point::new(30, 50));
+        framect += 1;
+        if framect % 10 ==0 {
+            println!("{} : {}", time::now().ctime(), framect);
+        }
         renderer.present();
         match sdl2::event::poll_event() {
             sdl2::event::QuitEvent(_) => break,
