@@ -45,6 +45,25 @@ impl Vector {
     fn diff(&self, v2: Vector) -> Vector {
         Vector { x: v2.x - self.x, y: v2.y -self.y }
     }
+
+    fn angle(&self) -> f64 {
+        let angle = (self.y/self.x).atan();
+        if self.y > 0. && self.x < 0. {
+            //upper left quadrant
+            angle + f64::consts::PI
+        } else if self.y < 0. && self.x < 0. {
+            //lower left quadrant
+            angle - f64::consts::PI
+        } else {
+            angle
+        }
+    }
+}
+
+impl Particle {
+    fn kinetic_energy(&self) -> f64 {
+        0.5 * ((self.vel.x * self.vel.x) + (self.vel.y * self.vel.y)) * self.mass
+    }
 }
 
 
@@ -79,17 +98,17 @@ fn circle_points(x: f64, y: f64, r:f64) -> Vec<Point> {
     points
 }
 
-fn make_circular_galaxy() -> Vec<Particle> {
+fn make_circular_galaxy(num_stars: int, max_radius: f64) -> Vec<Particle> {
     let mut particles: Vec<Particle> = Vec::new();
     let pi =  f64::consts::PI;
     // n planets at radius r
-    //let ns = [20,  500,   100,  150,  200];
-    //let rs = [50., 100., 400., 250., 300.];
-    let ns = [500, 1000];
-    let rs = [50., 100.];
-    //let ns = [50];
-    //let rs = [100.];
-    for (&n, &r) in ns.iter().zip(rs.iter()) {
+    let ns = [0.5, 0.5];
+    let rs = [0.5, 1.0];
+    //let ns = [1.];
+    //let rs = [1.];
+    for (&nfrac, &rfrac) in ns.iter().zip(rs.iter()) {
+        let n = (nfrac * num_stars as f64) as int;
+        let r = rfrac * max_radius;
         for i in std::iter::range_inclusive(1, n) {
             let theta = (i as f64)/(n as f64)*2.0*pi;
             particles.push(Particle {pos:Vector {x: r*theta.cos(),   y: r*theta.sin()  }, 
@@ -115,8 +134,8 @@ fn make_random_galaxy(radius: f64, num_stars: int) -> Vec<Particle> {
                                  mass:1. });
     }
     //central particle
-    //particles.push(Particle {pos:Vector {x: 0., y: 0.  }, 
-                             //vel:Vector {x: 0., y: 0.}, mass:10000. });
+    particles.push(Particle {pos:Vector {x: 0., y: 0.  }, 
+                             vel:Vector {x: 0., y: 0.}, mass:10000. });
     particles
 }
 
@@ -124,20 +143,23 @@ fn init_velocity(particles: &mut Vec<Particle>) {
     let mut vels : Vec<Vector> = Vec::new();
     let weight = 1.;
     for p in particles.iter() {
-        let mut tot_force = Vector {x : 0., y: 0.};
+        let mut forcev = Vector {x : 0., y: 0.};
         for q in particles.iter() {
-            if q.pos != p.pos {
-                tot_force.add(&force(p, q))
+            if q != p {
+                forcev.add(&force(p, q))
             }
         }
-        let r = p.pos.modulus();
-
-        let mut v = Vector { x: (tot_force.y.abs()*r/p.mass).sqrt()*weight,
-                         y: (tot_force.x.abs()*r/p.mass).sqrt()*weight} ;
-        if tot_force.x < 0. { v.y *= -1. };
-        if tot_force.y > 0. { v.x *= -1. };
-        vels.push(v);
-        println!("pos x:{} fx:{} vel y:{} pos y:{} fy:{} vel x:{} tot_v:{}", p.pos.x, tot_force.x,v.y, p.pos.y, tot_force.y,v.x,v.modulus());
+        let theta = p.pos.angle();
+        let speed = (forcev.modulus()*p.pos.modulus()/p.mass).sqrt();
+        if theta.is_nan() {
+            let v = Vector {x: 0., y: 0.};
+            vels.push(v);
+        } else {
+            let v = Vector {x: speed*theta.sin(), y: -speed*theta.cos()};
+            vels.push(v);
+        }
+        //println!("pos x:{:0.2f} fx:{:0.2f} vel y:{:0.2f} pos y:{:0.2f} fy:{:0.2f} vel x:{:0.2f} tot_v:{:0.2f}",
+        //p.pos.x, forcev.x,v.y, p.pos.y, forcev.y,v.x,v.modulus());
     }
     for (p,&v) in particles.mut_iter().zip(vels.iter()) {
         p.vel  = v;
@@ -223,6 +245,7 @@ fn animate() {
     //by combining textures with alpha-transparancy
     let renderer = get_renderer();
     let mut particles = make_random_galaxy(500., 1000);
+    //let mut particles = make_circular_galaxy(1000, 200.);
     init_velocity(&mut particles);
     let lenp = particles.len();
     let mut framect = 0;
@@ -247,7 +270,12 @@ fn animate() {
         //renderer.draw_line(Point::new(1,2),Point::new(30, 50));
         framect += 1;
         if framect % 10 ==0 {
-            println!("{} : {}", time::now().ctime(), framect);
+            //println!("{} : {}", time::now().ctime(), framect);
+            let mut ke = 0.;
+            for p in particles.iter() {
+                ke += p.kinetic_energy()
+            }
+            println!("KE: {}", ke)
         }
         renderer.present();
         match sdl2::event::poll_event() {
@@ -268,33 +296,16 @@ fn get_renderer() -> sdl2::render::Renderer<sdl2::video::Window> {
 }
 
 
-fn bitmappy() {
-    let renderer = get_renderer();
-    renderer.clear();
-    let bmp = match sdl2::surface::Surface::from_bmp(&std::path::Path::new("lib/LAND3.BMP")) {
-        Ok(bmap) =>  bmap,
-        Err(e)   => fail!(e)
-    };
-    let tex = match renderer.create_texture_from_surface(&bmp) {
-        Ok(t) => t,
-        Err(e) => fail!(e)
-    };
-    renderer.copy(&tex, None, Some(sdl2::rect::Rect::new(100,100,100,100)));
-    renderer.present();
-    loop {
-        match sdl2::event::poll_event() {
-            sdl2::event::QuitEvent(_) => break,
-            sdl2::event::KeyDownEvent(_, _, key, _, _) => {
-                if key == sdl2::keycode::EscapeKey {
-                    break
-                }
-            }
-            _ => {}
-        }
-    }
+fn main() {
+    animate();
 }
 
-fn main() {
-    //bitmappy();
-    animate();
+fn testtan() {
+    let pi = f64::consts::PI;
+    let xs = [1., -1., -1., 1.];
+    let ys = [2., 2., -2., -2.];
+    for (&x, &y) in xs.iter().zip(ys.iter()) {
+        let v = Vector {x: x, y: y};
+        println!("x {} y {} theta {}", x, y, v.angle()*180./pi)
+    }
 }
