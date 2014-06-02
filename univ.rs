@@ -263,14 +263,14 @@ fn pcls2points(particles: &Vec<Particle>) -> Vec<Point> {
 fn animate() {
     let renderer = get_renderer();
 
-    let centre1 = Particle { pos: Vector {x: 100., y:100.},
-                         vel: Vector {x: -40., y:10.},
-                         mass: 10000.};
+    let centre1 = Particle { pos: Vector {x: 0., y:0.},
+                         vel: Vector {x: 0., y:0.},
+                         mass: 1000.};
     let centre2 = Particle { pos: Vector {x: 0., y:0.},
                          vel: Vector {x: 10., y:10.},
                          mass: 1.};
-    let mut particles = make_galaxy(Circular, centre1, 400., 100);
-    let galaxy2 = make_galaxy(Circular, centre2, 400., 1000);
+    let mut particles = make_galaxy(Circular, centre1, 400., 1000);
+    //let galaxy2 = make_galaxy(Circular, centre2, 400., 1000);
     
     print_state(&particles);
 
