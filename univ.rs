@@ -244,8 +244,8 @@ fn animate() {
     //This is pretty mangled - half way through trying to create tails
     //by combining textures with alpha-transparancy
     let renderer = get_renderer();
-    let mut particles = make_random_galaxy(500., 1000);
-    //let mut particles = make_circular_galaxy(1000, 200.);
+    //let mut particles = make_random_galaxy(500., 1000);
+    let mut particles = make_circular_galaxy(1000, 200.);
     init_velocity(&mut particles);
     let lenp = particles.len();
     let mut framect = 0;
