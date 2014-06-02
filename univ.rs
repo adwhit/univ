@@ -15,6 +15,7 @@ static EPS: f64 = 0.;
 static NBYTES: uint = 4;
 
 #[deriving(PartialEq)]
+#[deriving(Clone)]
 struct Particle {
     pos : Vector,
     vel : Vector,
@@ -22,6 +23,7 @@ struct Particle {
 }
 
 #[deriving(PartialEq)]
+#[deriving(Clone)]
 struct Vector {
     x : f64,
     y : f64
@@ -266,11 +268,12 @@ fn animate() {
     let centre1 = Particle { pos: Vector {x: 0., y:0.},
                          vel: Vector {x: 0., y:0.},
                          mass: 1000.};
-    let centre2 = Particle { pos: Vector {x: 0., y:0.},
-                         vel: Vector {x: 10., y:10.},
-                         mass: 1.};
-    let mut particles = make_galaxy(Circular, centre1, 400., 1000);
-    //let galaxy2 = make_galaxy(Circular, centre2, 400., 1000);
+    let centre2 = Particle { pos: Vector {x: 4000., y:0.},
+                         vel: Vector {x: -100., y: 0.},
+                         mass: 1000.};
+    let mut particles = make_galaxy(Random, centre1, 200., 800);
+    let galaxy2 = make_galaxy(Random, centre2, 200.,0);
+    particles.push_all(galaxy2.as_slice());
     
     print_state(&particles);
 
