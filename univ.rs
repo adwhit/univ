@@ -150,15 +150,19 @@ fn make_galaxy(shape: Galaxy, central_pcl : Particle, radius: f64, num_stars: in
         Random => spawn_random_galaxy(radius, num_stars),
         Circular => spawn_circular_galaxy(radius, num_stars)
     };
-    init_velocity(&mut particles, &central_pcl);
+    init_velocity(&mut particles, central_pcl.mass);
     offset(&mut particles, &central_pcl);
     particles.push(central_pcl);
     particles
 }
 
-fn init_velocity(particles: &mut Vec<Particle>, central_pcl: &Particle) {
+fn init_velocity(particles: &mut Vec<Particle>, central_mass: f64) {
     let mut vels : Vec<Vector> = Vec::new();
-    let weight = 1.;
+
+    // need to make dummy since we are initialising centred on zero
+    let dummy_central_pcl = Particle { pos: Vector {x:0., y:0.},
+                                       vel: Vector {x:0., y:0.},
+                                       mass: central_mass };
     for p in particles.iter() {
         let mut forcev = Vector {x : 0., y: 0.};
         for q in particles.iter() {
@@ -166,7 +170,7 @@ fn init_velocity(particles: &mut Vec<Particle>, central_pcl: &Particle) {
                 forcev.add(&force(p, q))
             }
         }
-        forcev.add(&force(p, central_pcl));
+        forcev.add(&force(p, &dummy_central_pcl));
         let theta = p.pos.angle();
         let speed = (forcev.modulus()*p.pos.modulus()/p.mass).sqrt();
         if theta.is_nan() {
@@ -259,12 +263,12 @@ fn pcls2points(particles: &Vec<Particle>) -> Vec<Point> {
 fn animate() {
     let renderer = get_renderer();
 
-    let centre1 = Particle { pos: Vector {x: -200., y:-200.},
-                         vel: Vector {x: 0., y:0.},
+    let centre1 = Particle { pos: Vector {x: 100., y:100.},
+                         vel: Vector {x: -40., y:10.},
                          mass: 10000.};
     let centre2 = Particle { pos: Vector {x: 0., y:0.},
                          vel: Vector {x: 10., y:10.},
-                         mass: 1000.};
+                         mass: 1.};
     let mut particles = make_galaxy(Circular, centre1, 400., 100);
     let galaxy2 = make_galaxy(Circular, centre2, 400., 1000);
     
