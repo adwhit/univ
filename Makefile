@@ -4,7 +4,7 @@ FLAGS =  -O
 
 all: univ
 
-univ: univ.rs 
+univ: main.rs 
 	rustc $< -o $@ -L $(SDLLIB) $(FLAGS)
 
 dep:$(SDLLIB)

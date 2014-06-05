@@ -1,35 +1,24 @@
-extern crate sdl2;
-extern crate time;
+use std::{f64, iter, rand};
 
-use std::io::timer::sleep;
-use sdl2::rect::Point;
-use sdl2::pixels::{RGB, RGBA};
-use std::rand;
-use std::f64;
-
-static WIDTH: uint = 2048;
-static HEIGHT: uint = 1400;
-static FPS: int = 60;
 static DT: f64 = 0.05;
 static EPS: f64 = 0.;
-static NBYTES: uint = 4;
 
 #[deriving(PartialEq)]
 #[deriving(Clone)]
-struct Particle {
-    pos : Vector,
-    vel : Vector,
-    mass: f64
+pub struct Particle {
+    pub pos : Vector,
+    pub vel : Vector,
+    pub mass: f64
 }
 
 #[deriving(PartialEq)]
 #[deriving(Clone)]
-struct Vector {
-    x : f64,
-    y : f64
+pub struct Vector {
+    pub x : f64,
+    pub y : f64
 }
 
-enum Galaxy {
+pub enum Galaxy {
     Random,
     Circular
 }
@@ -71,6 +60,12 @@ impl Particle {
     fn kinetic_energy(&self) -> f64 {
         0.5 * ((self.vel.x * self.vel.x) + (self.vel.y * self.vel.y)) * self.mass
     }
+
+    fn steppos(&mut self) {
+        self.pos.x = self.pos.x + self.vel.x*DT;
+        self.pos.y = self.pos.y + self.vel.y*DT;
+    }
+
 }
 
 
@@ -82,41 +77,19 @@ fn force(p1: &Particle, p2: &Particle) -> Vector {
     Vector { x: f*disp.x/dist, y: f*disp.y/dist }
 }
 
-fn steppos(m: &mut Particle) {
-    m.pos.x = m.pos.x + m.vel.x*DT;
-    m.pos.y = m.pos.y + m.vel.y*DT;
-}
-
-
-fn circle_points(x: f64, y: f64, r:f64) -> Vec<Point> {
-    let mut points: Vec<Point> = Vec::new();
-    let rr = r as i32;
-    let xr = x as i32;
-    let yr = y as i32;
-    for dy in range(0,rr) {
-        let xlim = ((rr*rr - dy*dy) as f64).sqrt() as i32;
-        for dx in range (0, xlim) {
-            points.push(Point {x:xr + dx, y: yr + dy});
-            points.push(Point {x:xr - dx, y: yr + dy});
-            points.push(Point {x:xr + dx, y: yr - dy});
-            points.push(Point {x:xr - dx, y: yr - dy});
-        }
-    }
-    points
-}
 
 fn spawn_circular_galaxy(max_radius: f64, num_stars: int) -> Vec<Particle> {
     let mut particles: Vec<Particle> = Vec::new();
     let pi =  f64::consts::PI;
     // n planets at radius r
-    let ns = [0.5, 0.5];
-    let rs = [0.5, 1.0];
+    let ns = [0.1,0.2,0.3,0.4];
+    let rs = [0.2,0.5,0.7,1.0];
     //let ns = [1.];
     //let rs = [1.];
     for (&nfrac, &rfrac) in ns.iter().zip(rs.iter()) {
         let n = (nfrac * num_stars as f64) as int;
         let r = rfrac * max_radius;
-        for i in std::iter::range_inclusive(1, n) {
+        for i in iter::range_inclusive(1, n) {
             let theta = (i as f64)/(n as f64)*2.0*pi;
             particles.push(Particle {pos:Vector {x: r*theta.cos(),   y: r*theta.sin()  }, 
                                      vel:Vector {x: 0., y: 0.},
@@ -128,7 +101,7 @@ fn spawn_circular_galaxy(max_radius: f64, num_stars: int) -> Vec<Particle> {
 
 fn spawn_random_galaxy(radius: f64, num_stars: int) -> Vec<Particle> {
     let mut particles: Vec<Particle> = Vec::new();
-    for i in range(0,num_stars) {
+    for _ in range(0,num_stars) {
         let theta = rand::random::<f64>()*360.;
         let r = rand::random::<f64>()*radius;
         let x =  r*theta.cos();
@@ -147,7 +120,7 @@ fn offset(particles: &mut Vec<Particle>, central_pcl: &Particle) {
     }
 }
 
-fn make_galaxy(shape: Galaxy, central_pcl : Particle, radius: f64, num_stars: int) -> Vec<Particle> {
+pub fn make_galaxy(shape: Galaxy, central_pcl : Particle, radius: f64, num_stars: int) -> Vec<Particle> {
     let mut particles = match shape {
         Random => spawn_random_galaxy(radius, num_stars),
         Circular => spawn_circular_galaxy(radius, num_stars)
@@ -220,94 +193,19 @@ fn stepvel(force: Vector, p: &mut Particle, sense:bool) {
     }
 }
 
-fn stepsim(particles: &mut Vec<Particle>, lenp: uint) {
+pub fn stepsim(particles: &mut Vec<Particle>, lenp: uint) {
     for i in range(0, lenp) {
         for j in range(i+1, lenp) {
             if i != j {
-                let mut f = force(particles.get(i), particles.get(j));
+                let f = force(particles.get(i), particles.get(j));
                 stepvel(f, particles.get_mut(i), true);
                 stepvel(f, particles.get_mut(j), false);
             }
         }
     }
     for p in particles.mut_iter() {
-        steppos(p);
+        p.steppos();
     }
-}
-
-fn pcls2pixel(particles: &Vec<Particle>) -> ~[u8] {
-    let mut arr : ~[u8] = ~[0,..NBYTES*WIDTH*HEIGHT];
-    let midx = (WIDTH/2) as f64;
-    let midy = (HEIGHT/2) as f64;
-    for p in particles.iter() {
-        let xind = (p.pos.x + midx) as uint;
-        let yind = (p.pos.y + midy) as uint;
-        if xind < WIDTH && yind < HEIGHT {
-            let ix = NBYTES * ((yind * WIDTH) + xind);
-            arr[ix] = 0xff;
-            arr[ix+1] = 0xff;
-            arr[ix+2] = 0xff;
-        }
-    }
-    arr
-}
-
-fn pcls2points(particles: &Vec<Particle>) -> Vec<Point> {
-    let midx = (WIDTH/2) as f64;
-    let midy = (HEIGHT/2) as f64;
-    let mut arr: Vec<Point> = Vec::new();
-    for p in particles.iter() {
-        arr.push(Point {x: (p.pos.x + midx) as i32, y: (p.pos.y + midy) as i32 })
-    }
-    arr
-}
-
-fn animate() {
-    let renderer = get_renderer();
-
-    let centre1 = Particle { pos: Vector {x: 0., y:0.},
-                         vel: Vector {x: 0., y:0.},
-                         mass: 1000.};
-    let centre2 = Particle { pos: Vector {x: 4000., y:0.},
-                         vel: Vector {x: -100., y: 0.},
-                         mass: 1000.};
-    let mut particles = make_galaxy(Random, centre1, 200., 800);
-    let galaxy2 = make_galaxy(Random, centre2, 200.,0);
-    particles.push_all(galaxy2.as_slice());
-    
-    print_state(&particles);
-
-    let lenp = particles.len();
-    let mut framect = 0;
-    let pixels : ~[u8] = ~[0,..NBYTES*WIDTH*HEIGHT];
-
-    renderer.clear();
-    loop {
-        renderer.clear();
-        stepsim(&mut particles, lenp);
-        let points = pcls2points(&particles);
-        renderer.draw_points(points.as_slice());
-        if framect % 10 ==0 {
-            //println!("{} : {}", time::now().ctime(), framect);
-        }
-        renderer.present();
-        framect += 1;
-        match sdl2::event::poll_event() {
-            sdl2::event::QuitEvent(_) => break,
-            sdl2::event::KeyDownEvent(_, _, key, _, _) => {
-                if key == sdl2::keycode::EscapeKey {
-                    break
-                }
-            }
-            _ => {}
-        }
-    }
-    sdl2::quit();
-    print_state(&particles);
-}
-
-fn get_renderer() -> sdl2::render::Renderer<sdl2::video::Window> {
-    sdl2::render::Renderer::new_with_window(WIDTH as int, HEIGHT as int, sdl2::video::FullscreenDesktop).unwrap()
 }
 
 fn total_ke(particles: &Vec<Particle>) -> f64 {
@@ -324,9 +222,4 @@ fn print_state(particles: &Vec<Particle>) {
                 p.pos.x, p.pos.y, p.vel.x, p.vel.y, p.pos.modulus(), p.vel.modulus())
     }
     println!("KE: {:0.2f}", total_ke(particles));
-}
-
-
-fn main() {
-    animate();
 }
