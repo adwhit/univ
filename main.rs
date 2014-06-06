@@ -7,6 +7,8 @@ use std::rand;
 use physics::{Particle, PhysVec};
 
 mod physics;
+mod barneshut;
+
 
 static WIDTH: uint = 2048;
 static HEIGHT: uint = 1400;
