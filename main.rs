@@ -4,7 +4,7 @@ extern crate time;
 use sdl2::rect::Point;
 use sdl2::pixels::{RGB, RGBA};
 use std::rand;
-use physics::{Particle, Vector};
+use physics::{Particle, PhysVec};
 
 mod physics;
 
@@ -59,19 +59,19 @@ fn pcls2points(particles: &Vec<Particle>) -> Vec<Point> {
 fn animate() {
     let renderer = get_renderer();
 
-    let centre1 = Particle { pos: Vector {x: 200., y:0.},
-                         vel: Vector {x: 0., y:0.},
+    let centre1 = Particle { pos: PhysVec {x: 200., y:0.},
+                         vel: PhysVec {x: 0., y:0.},
                          mass: 1000.};
-    let centre2 = Particle { pos: Vector {x: 2000., y:100.},
-                         vel: Vector {x: -100., y: 0.},
+    let centre2 = Particle { pos: PhysVec {x: 2000., y:100.},
+                         vel: PhysVec {x: -100., y: 0.},
                          mass: 1000.};
-    let centre3 = Particle { pos: Vector {x: 2000., y:-100.},
-                         vel: Vector {x: -100., y: 0.},
+    let centre3 = Particle { pos: PhysVec {x: 2000., y:-100.},
+                         vel: PhysVec {x: -100., y: 0.},
                          mass: 1000.};
     let galaxy1 = physics::make_galaxy(physics::Random, centre1, 600., 1500);
     //let galaxy2 = make_galaxy(physics::Random, centre2, 200., 300);
     let mut particles : Vec<Particle> = Vec::new();
-    particles.push_all(galaxy1.to_slice());
+    particles.push_all(galaxy1.as_slice());
     //particles.push_all(galaxy2.as_slice());
     particles.push(centre2);
     particles.push(centre3);
@@ -87,7 +87,7 @@ fn animate() {
         renderer.clear();
         physics::stepsim(&mut particles, lenp);
         let points = pcls2points(&particles);
-        renderer.draw_points(points.slice(0,2));
+        renderer.draw_points(points.as_slice());
         renderer.present();
         framect += 1;
         match sdl2::event::poll_event() {

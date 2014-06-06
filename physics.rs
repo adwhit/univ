@@ -6,14 +6,14 @@ static EPS: f64 = 0.;
 #[deriving(PartialEq)]
 #[deriving(Clone)]
 pub struct Particle {
-    pub pos : Vector,
-    pub vel : Vector,
+    pub pos : PhysVec,
+    pub vel : PhysVec,
     pub mass: f64
 }
 
 #[deriving(PartialEq)]
 #[deriving(Clone)]
-pub struct Vector {
+pub struct PhysVec {
     pub x : f64,
     pub y : f64
 }
@@ -23,13 +23,13 @@ pub enum Galaxy {
     Circular
 }
 
-impl Vector {
-    fn add(&mut self, other: &Vector) {
+impl PhysVec {
+    fn add(&mut self, other: &PhysVec) {
         self.x += other.x;
         self.y += other.y;
     }
 
-    fn dot(&self, other: &Vector) -> f64 {
+    fn dot(&self, other: &PhysVec) -> f64 {
     self.x * other.x + self.y * other.y
     }
 
@@ -38,8 +38,8 @@ impl Vector {
     }
 
     //vector pointing from v1 towards v2
-    fn diff(&self, v2: Vector) -> Vector {
-        Vector { x: v2.x - self.x, y: v2.y -self.y }
+    fn diff(&self, v2: PhysVec) -> PhysVec {
+        PhysVec { x: v2.x - self.x, y: v2.y -self.y }
     }
 
     fn angle(&self) -> f64 {
@@ -70,11 +70,11 @@ impl Particle {
 
 
 //force is calculated as pointing from particle 1 towards particle 2
-fn force(p1: &Particle, p2: &Particle) -> Vector {
+fn force(p1: &Particle, p2: &Particle) -> PhysVec {
     let disp = p1.pos.diff(p2.pos);
     let dist = disp.modulus() + EPS;
     let f = p1.mass * p2.mass / dist; // force magnitude
-    Vector { x: f*disp.x/dist, y: f*disp.y/dist }
+    PhysVec { x: f*disp.x/dist, y: f*disp.y/dist }
 }
 
 
@@ -91,8 +91,8 @@ fn spawn_circular_galaxy(max_radius: f64, num_stars: int) -> Vec<Particle> {
         let r = rfrac * max_radius;
         for i in iter::range_inclusive(1, n) {
             let theta = (i as f64)/(n as f64)*2.0*pi;
-            particles.push(Particle {pos:Vector {x: r*theta.cos(),   y: r*theta.sin()  }, 
-                                     vel:Vector {x: 0., y: 0.},
+            particles.push(Particle {pos:PhysVec {x: r*theta.cos(),   y: r*theta.sin()  }, 
+                                     vel:PhysVec {x: 0., y: 0.},
                                      mass:1. });
         }
     }
@@ -106,8 +106,8 @@ fn spawn_random_galaxy(radius: f64, num_stars: int) -> Vec<Particle> {
         let r = rand::random::<f64>()*radius;
         let x =  r*theta.cos();
         let y =  r*theta.sin();
-        particles.push(Particle {pos:Vector {x: x,  y: y },
-                                 vel:Vector {x: 0., y: 0.},
+        particles.push(Particle {pos:PhysVec {x: x,  y: y },
+                                 vel:PhysVec {x: 0., y: 0.},
                                  mass:1. });
     }
     particles
@@ -132,14 +132,14 @@ pub fn make_galaxy(shape: Galaxy, central_pcl : Particle, radius: f64, num_stars
 }
 
 fn init_velocity(particles: &mut Vec<Particle>, central_mass: f64) {
-    let mut vels : Vec<Vector> = Vec::new();
+    let mut vels : Vec<PhysVec> = Vec::new();
 
     // need to make dummy since we are initialising centred on zero
-    let dummy_central_pcl = Particle { pos: Vector {x:0., y:0.},
-                                       vel: Vector {x:0., y:0.},
+    let dummy_central_pcl = Particle { pos: PhysVec {x:0., y:0.},
+                                       vel: PhysVec {x:0., y:0.},
                                        mass: central_mass };
     for p in particles.iter() {
-        let mut forcev = Vector {x : 0., y: 0.};
+        let mut forcev = PhysVec {x : 0., y: 0.};
         for q in particles.iter() {
             if q != p {
                 forcev.add(&force(p, q))
@@ -149,10 +149,10 @@ fn init_velocity(particles: &mut Vec<Particle>, central_mass: f64) {
         let theta = p.pos.angle();
         let speed = (forcev.modulus()*p.pos.modulus()/p.mass).sqrt();
         if theta.is_nan() {
-            let v = Vector {x: 0., y: 0.};
+            let v = PhysVec {x: 0., y: 0.};
             vels.push(v);
         } else {
-            let v = Vector {x: speed*theta.sin(), y: -speed*theta.cos()};
+            let v = PhysVec {x: speed*theta.sin(), y: -speed*theta.cos()};
             vels.push(v);
         }
     }
@@ -178,12 +178,12 @@ fn centre_of_mass(particles: &Vec<Particle>) -> Particle {
         py += p.vel.y*p.mass;
         m += p.mass;
     }
-    return Particle {pos: Vector {x: rx/m, y: ry/m},
-                     vel: Vector {x: px/m, y: py/m},
+    return Particle {pos: PhysVec {x: rx/m, y: ry/m},
+                     vel: PhysVec {x: px/m, y: py/m},
                      mass: m}
 }
 
-fn stepvel(force: Vector, p: &mut Particle, sense:bool) {
+fn stepvel(force: PhysVec, p: &mut Particle, sense:bool) {
     if sense {
         p.vel.x += force.x/p.mass*DT;
         p.vel.y += force.y/p.mass*DT;
