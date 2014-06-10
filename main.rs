@@ -70,7 +70,7 @@ fn animate() {
     let centre3 = Particle { pos: PhysVec {x: 2000., y:-100.},
                          vel: PhysVec {x: -100., y: 0.},
                          mass: 1000.};
-    let galaxy1 = physics::make_galaxy(physics::Random, centre1, 600., 1500);
+    let galaxy1 = physics::make_galaxy(physics::Random, centre1, 300., 1500);
     //let galaxy2 = make_galaxy(physics::Random, centre2, 200., 300);
     let mut particles : Vec<Particle> = Vec::new();
     particles.push_all(galaxy1.as_slice());
