@@ -1,10 +1,10 @@
 use physics::Particle;
 
 struct Node {
-    tl : Box<Child>,
-    tr : Box<Child>,
-    bl : Box<Child>,
-    br : Box<Child>
+    tl : Box<Child<Particle>>,
+    tr : Box<Child<Particle>>,
+    bl : Box<Child<Particle>>,
+    br : Box<Child<Particle>>
 }
 
 impl Node {
@@ -16,7 +16,7 @@ impl Node {
     }
 }
 
-enum Child {
+enum Child<Particle> {
     Many(BoxAttr,Box<Node>),
     One(Particle),
     Zero
