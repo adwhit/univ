@@ -53,3 +53,14 @@ fn create_tree(particles: &Vec<Particle>) -> QuadTree {
     let mut root = Node::new();
     QuadTree { root: root }
 }
+
+#[test]
+fn test_bh() {
+    v : Vec<Particle> = Vec::new()
+    for x in range(0,100) {
+        v.push( Particle { pos: PhysVec { x: x, y: x },
+                           vel: PhysVec { x: x, y: x },
+                           mass: x as f64
+                         } )
+    }
+}
