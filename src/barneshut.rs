@@ -1,14 +1,14 @@
 use physics::Particle;
 
-struct Node {
-    tl : Box<Child>,
-    tr : Box<Child>,
-    bl : Box<Child>,
-    br : Box<Child>
+struct Node<'a> {
+    tl : Box<Child<'a>>,
+    tr : Box<Child<'a>>,
+    bl : Box<Child<'a>>,
+    br : Box<Child<'a>>
 }
 
-impl Node {
-    fn new() -> Node {
+impl<'a> Node<'a> {
+    fn new() -> Node<'a> {
         Node  { tl: box Zero,
                tr: box Zero,
                bl: box Zero,
@@ -16,9 +16,9 @@ impl Node {
     }
 }
 
-enum Child {
-    Many(BoxStats,Box<Node>),
-    One(Particle),
+enum Child<'a> {
+    Many(BoxStats, Node<'a>),
+    One(&'a Particle),
     Zero
 }
 
@@ -31,11 +31,11 @@ struct BoxStats {
     mass : f64
 }
 
-struct QuadTree {
-    root: Node
+struct QuadTree<'a> {
+    root: Node<'a>
 }
 
-fn find_bounding_box(particles: &Vec<Particle>) -> (f64, f64, f64, f64) {
+fn find_bounding_box(particles: &Vec<&Particle>) -> (f64, f64, f64, f64) {
     let mut xmax = Float::neg_infinity(); let mut ymax = Float::neg_infinity();
     let mut xmin = Float::infinity();     let mut ymin = Float::infinity();
     for p in particles.iter() {
@@ -47,28 +47,44 @@ fn find_bounding_box(particles: &Vec<Particle>) -> (f64, f64, f64, f64) {
     (xmax, xmin, ymax, ymin)
 }
 
-fn create_tree(particles: &Vec<Particle>) -> QuadTree {
-    let (xmax, xmin, ymax, ymin) = find_bounding_box(particles);
-    let xcentre = xmax + xmin / 2.0;
-    let ycentre = ymax + ymin / 2.0;
+fn create_tree(particles: Vec<&Particle>) -> QuadTree {
+    let (xmax, xmin, ymax, ymin) = find_bounding_box(&particles);
+    let x = xmax + xmin / 2.0;
+    let y = ymax + ymin / 2.0;
     let mut root = Node::new();
     let qt = QuadTree { root: root };
-    let (tl, tr, bl, br) = partition(particles);
+    let (tl, tr, bl, br) = partition(particles, x, y);
     qt
 }
 
-fn descend(particles: &Vec<Particle>) -> Node {
-    let (tla, tra, bla, bra) = partition(particles);
-    let tl = if tls.len() > 1 { } //XXX Finish!
+fn make_node<'a>(particles: Vec<&'a Particle>, x: f64, y: f64, xvar: f64, yvar: f64) -> Node<'a> {
+    let (tla, tra, bla, bra) = partition(particles, x, y);
+    Node { tl: box make_child(tla, x-xvar/2., y+yvar/2., xvar/2., yvar/2.),
+           tr: box make_child(tra, x+xvar/2., y+yvar/2., xvar/2., yvar/2.),
+           bl: box make_child(bla, x-xvar/2., y-yvar/2., xvar/2., yvar/2.),
+           br: box make_child(bra, x-xvar/2., y+yvar/2., xvar/2., yvar/2.),
+    }
 }
 
-fn partition(particles: &Vec<Particle>, xsplit: f64, ysplit: f64) ->
-    (Vec<Particle>, Vec<Particle>, Vec<Particle>, Vec<Particle>) {
-    let mut tr: Vec<Particle> = Vec::new();
-    let mut br: Vec<Particle> = Vec::new();
-    let mut tl: Vec<Particle> = Vec::new();
-    let mut bl: Vec<Particle> = Vec::new();
-    for p in particles.iter() {
+fn make_child<'a>(particles: Vec<&'a Particle>, x: f64, y: f64, xvar: f64, yvar: f64) -> Child<'a> {
+    let n = particles.len();
+    if n > 1 { 
+        let stats = calc_stats(&particles, x, y);
+        return Many(stats, make_node(particles, x, y, xvar, yvar));
+    } else if n == 1 {
+        return One(*particles.get(0));
+    } else {
+        return Zero;
+    }
+}
+
+fn partition<'a>(particles: Vec<&'a Particle>, xsplit: f64, ysplit: f64) ->
+    (Vec<&'a Particle>, Vec<&'a Particle>, Vec<&'a Particle>, Vec<&'a Particle>) {
+    let mut tr: Vec<&Particle> = Vec::new();
+    let mut br: Vec<&Particle> = Vec::new();
+    let mut tl: Vec<&Particle> = Vec::new();
+    let mut bl: Vec<&Particle> = Vec::new();
+    for &p in particles.iter() {
         if p.pos.x > xsplit {
             if p.pos.y > ysplit {
                 tr.push(p)
@@ -86,7 +102,7 @@ fn partition(particles: &Vec<Particle>, xsplit: f64, ysplit: f64) ->
     (tl, tr, bl, br)
 }
 
-fn calc_stats(particles: &Vec<Particle>, x: f64, y:f64) -> BoxStats {
+fn calc_stats(particles: &Vec<&Particle>, x: f64, y:f64) -> BoxStats {
     let mut xmass_sum = 0.;
     let mut ymass_sum = 0.;
     let mut mass = 0.;
@@ -97,6 +113,7 @@ fn calc_stats(particles: &Vec<Particle>, x: f64, y:f64) -> BoxStats {
         mass += p.mass;
         num_pcls += 1;
     }
+    println!("x:{} y: {} n:{}", x, y, num_pcls);
     BoxStats { x: x, 
                y: y, 
                num_particles: num_pcls,
@@ -123,10 +140,19 @@ mod bhtests {
         v
     }
 
+    fn dummy_pointers<'a>(particles: &'a Vec<Particle>) -> Vec<&'a Particle> {
+        let mut v : Vec<&Particle> = Vec::new();
+        for p in particles.iter() {
+            v.push(p)
+        }
+        v
+    }
+
     #[test]
     fn test_bounding_box() {
         let v = dummy_particles();
-        let (xmax, xmin, ymax, ymin) = find_bounding_box(&v);
+        let vp = dummy_pointers(&v);
+        let (xmax, xmin, ymax, ymin) = find_bounding_box(&vp);
         assert!(xmax == 99.0)
         assert!(ymax == 100.0)
         assert!(xmin == 0.)
@@ -136,7 +162,7 @@ mod bhtests {
     #[test]
     fn test_tree() {
         let v = dummy_particles();
-        create_tree(v)
+        let vp = dummy_pointers(&v);
+        create_tree(vp);
     }
-
 }
