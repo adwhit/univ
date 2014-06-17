@@ -24,21 +24,21 @@ pub enum Galaxy {
 }
 
 impl PhysVec {
-    fn add(&mut self, other: &PhysVec) {
+    pub fn add(&mut self, other: &PhysVec) {
         self.x += other.x;
         self.y += other.y;
     }
 
-    fn dot(&self, other: &PhysVec) -> f64 {
+    pub fn dot(&self, other: &PhysVec) -> f64 {
     self.x * other.x + self.y * other.y
     }
 
-    fn modulus(&self) -> f64 {
+    pub fn modulus(&self) -> f64 {
         (self.x * self.x + self.y* self.y).sqrt()
     }
 
     //vector pointing from v1 towards v2
-    fn diff(&self, v2: PhysVec) -> PhysVec {
+    pub fn diff(&self, v2: PhysVec) -> PhysVec {
         PhysVec { x: v2.x - self.x, y: v2.y -self.y }
     }
 
@@ -70,7 +70,7 @@ impl Particle {
 
 
 //force is calculated as pointing from particle 1 towards particle 2
-fn force(p1: &Particle, p2: &Particle) -> PhysVec {
+pub fn force(p1: &Particle, p2: &Particle) -> PhysVec {
     let disp = p1.pos.diff(p2.pos);
     let dist = disp.modulus() + EPS;
     let f = p1.mass * p2.mass / dist; // force magnitude
