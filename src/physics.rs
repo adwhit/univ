@@ -183,7 +183,7 @@ fn centre_of_mass(particles: &Vec<Particle>) -> Particle {
                      mass: m}
 }
 
-fn stepvel(force: PhysVec, p: &mut Particle, sense:bool) {
+pub fn stepvel(p: &mut Particle, force: PhysVec, sense:bool) {
     if sense {
         p.vel.x += force.x/p.mass*DT;
         p.vel.y += force.y/p.mass*DT;
@@ -198,8 +198,8 @@ pub fn stepsim(particles: &mut Vec<Particle>, lenp: uint) {
         for j in range(i+1, lenp) {
             if i != j {
                 let f = force(particles.get(i), particles.get(j));
-                stepvel(f, particles.get_mut(i), true);
-                stepvel(f, particles.get_mut(j), false);
+                stepvel(particles.get_mut(i), f, true);
+                stepvel(particles.get_mut(j), f, false);
             }
         }
     }

@@ -64,21 +64,9 @@ fn animate() {
     let centre1 = Particle { pos: PhysVec {x: 200., y:0.},
                          vel: PhysVec {x: 0., y:0.},
                          mass: 1000.};
-    let centre2 = Particle { pos: PhysVec {x: 2000., y:100.},
-                         vel: PhysVec {x: -100., y: 0.},
-                         mass: 1000.};
-    let centre3 = Particle { pos: PhysVec {x: 2000., y:-100.},
-                         vel: PhysVec {x: -100., y: 0.},
-                         mass: 1000.};
     let galaxy1 = physics::make_galaxy(physics::Random, centre1, 300., 1500);
-    //let galaxy2 = make_galaxy(physics::Random, centre2, 200., 300);
     let mut particles : Vec<Particle> = Vec::new();
     particles.push_all(galaxy1.as_slice());
-    //particles.push_all(galaxy2.as_slice());
-    particles.push(centre2);
-    particles.push(centre3);
-    
-    //print_state(&particles);
 
     let lenp = particles.len();
     let mut framect = 0;
@@ -87,7 +75,8 @@ fn animate() {
     renderer.clear();
     loop {
         renderer.clear();
-        physics::stepsim(&mut particles, lenp);
+        //physics::stepsim(&mut particles, lenp);
+        barneshut::bh_stepsim(&mut particles, lenp, 1.0);
         let points = pcls2points(&particles);
         renderer.draw_points(points.as_slice());
         renderer.present();

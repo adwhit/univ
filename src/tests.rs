@@ -1,7 +1,7 @@
 #[cfg(test)]
 
-use barneshut::{QuadTree, find_bounding_box, bh_force};
-use physics::{Particle, PhysVec};
+use barneshut::{QuadTree, find_bounding_box, bh_force, pcl_pointers, bh_stepsim};
+use physics::{Particle, PhysVec, force};
 
 mod barneshut;
 mod physics;
@@ -17,18 +17,10 @@ fn dummy_particles(n: int) -> Vec<Particle> {
     v
 }
 
-fn dummy_pointers<'a>(particles: &'a Vec<Particle>) -> Vec<&'a Particle> {
-    let mut v : Vec<&Particle> = Vec::new();
-    for p in particles.iter() {
-        v.push(p)
-    }
-    v
-}
-
 #[test]
 fn test_bounding_box() {
     let v = dummy_particles(100);
-    let vp = dummy_pointers(&v);
+    let vp = pcl_pointers(&v);
     let (xmax, xmin, ymax, ymin) = find_bounding_box(&vp);
     assert!(xmax == 99.0)
     assert!(ymax == 100.5)
@@ -38,16 +30,36 @@ fn test_bounding_box() {
 
 #[test]
 fn test_tree() {
-    let v = dummy_particles(100);
-    let vp = dummy_pointers(&v);
-    let qt = QuadTree::new(vp);
-    for (ix, p) in v.iter().enumerate() {
-        let f = bh_force(p, &qt.root, 0.5).unwrap();
-        println!("ix: {:u}, fx: {:f}, fy: {:f}", ix, f.x, f.y);
+    let threshold = 2.0;
+    let pcls = dummy_particles(100);
+    let pptrs = pcl_pointers(&pcls);
+    let qt = QuadTree::new(pptrs, threshold);
+    for (ix, p) in pcls.iter().enumerate() {
+        let bhfrc = qt.force(p);
+        let mut frc = PhysVec {x: 0., y: 0.};
+        for q in pcls.iter() {
+            if p != q {
+                frc.add(&force(p, q))
+            }
+        }
+        println!("ix: {:u} diff: {:f}%", ix, (frc.x - bhfrc.x)/frc.x*100.);
+        /*
+        if (frc.x - bhfrc.x)/frc.x > eps || (frc.x - bhfrc.x)/frc.x < -1.*eps {
+            println!("ix: {:u}, fx: {:f}", ix, bhfrc.x);
+            println!("ix: {:u}, fx: {:f}\n", ix, frc.x);
+        }
+        if (frc.y - bhfrc.y)/frc.y > eps || (frc.y - bhfrc.y)/frc.y < -1.*eps {
+            println!("ix: {:u}, fy: {:f}", ix, bhfrc.y);
+            println!("ix: {:u}, fy: {:f}\n", ix, frc.y);
+        }
+        */
     }
 }
 
 #[test]
-fn test_bh_good_approx() {
-
+fn test_qt() {
+    let threshold = 2.0;
+    let mut pcls = dummy_particles(100);
+    let l = pcls.len();
+    bh_stepsim(&mut pcls, l, threshold)
 }

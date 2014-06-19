@@ -1,4 +1,4 @@
-use physics::{Particle, PhysVec, force};
+use physics::{Particle, PhysVec, force, stepvel};
 
 struct Branch<'a> {
     tl : Box<Node<'a>>,
@@ -31,11 +31,12 @@ struct BoxStats {
 }
 
 pub struct QuadTree<'a> {
-    pub root: Node<'a>
+    pub root: Node<'a>,
+    pub threshold: f64
 }
 
 impl<'a> QuadTree<'a> {
-    pub fn new<'a> (particles: Vec<&'a Particle>) -> QuadTree<'a> {
+    pub fn new<'a> (particles: Vec<&'a Particle>, threshold: f64) -> QuadTree<'a> {
         let (xmax, xmin, ymax, ymin) = find_bounding_box(&particles);
         let x = xmax + xmin / 2.0;
         let y = ymax + ymin / 2.0;
@@ -47,11 +48,13 @@ impl<'a> QuadTree<'a> {
         } else {
             xvar = yvar
         }
-        QuadTree { root: make_node(particles, x, y, xvar, yvar) }
+        QuadTree { root: make_node(particles, x, y, xvar, yvar),
+                   threshold: threshold
+        }
     }
 
-    fn force(&self, p: &Particle) -> Option<PhysVec> {
-        bh_force(p, &self.root, 0.5)
+    pub fn force(&self, p: &Particle) -> PhysVec {
+        bh_force(p, &self.root, self.threshold).unwrap()
     }
 }
 
@@ -80,6 +83,7 @@ fn make_node<'a>(particles: Vec<&'a Particle>, x: f64, y: f64, xvar: f64, yvar: 
     let n = particles.len();
     if n > 1 { 
         let stats = calc_stats(&particles, x, y, xvar, yvar);
+        println!("{} {} {}",  stats.num_particles, stats.pos.x, stats.width);
         return Many(stats, make_branch(particles, x, y, xvar, yvar));
     } else if n == 1 {
         return One(*particles.get(0));
@@ -123,7 +127,6 @@ fn calc_stats(particles: &Vec<&Particle>, x: f64, y:f64, xvar:f64, yvar:f64) -> 
         mass += p.mass;
         num_pcls += 1;
     }
-    //println!("x:{} y: {} n: {}", x, y, num_pcls);
     BoxStats { pos: PhysVec { x: x, y: y },
                com: Particle { 
                    pos: PhysVec {x: xmass_sum/mass, y: ymass_sum/mass},
@@ -141,7 +144,6 @@ pub fn bh_force(p: &Particle, node: &Node, threshold: f64) -> Option<PhysVec> {
         One(p2) => if p == p2 { return None } else { return Some(force(p, p2)) } ,
         Zero    => return None,
         Many(stats,ref branch) => {
-
             if p.pos.diff(stats.com.pos).modulus()/stats.width > threshold {
                 return Some(force(p, &stats.com))
             } else {
@@ -172,4 +174,25 @@ fn force_branch(p: &Particle, branch: &Branch, threshold: f64) -> PhysVec {
     tot_force
 }
 
+pub fn pcl_pointers<'a>(particles: &'a Vec<Particle>) -> Vec<&'a Particle> {
+    let mut v : Vec<&Particle> = Vec::with_capacity(particles.len());
+    for p in particles.iter() {
+        v.push(p)
+    }
+    v
+}
 
+
+pub fn bh_stepsim(particles: &mut Vec<Particle>, lenp: uint, threshold: f64) {
+    let mut frcs : Vec<PhysVec> =  Vec::with_capacity(lenp);
+    {
+        let pcl_ptrs = pcl_pointers(particles);
+        let qt = QuadTree::new(pcl_ptrs, threshold);
+        for p in particles.iter() {
+            frcs.push(qt.force(p));
+        }
+    }
+    for (p, &f) in particles.mut_iter().zip(frcs.iter()) {
+        stepvel(p, f, true)
+    }
+}

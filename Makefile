@@ -11,7 +11,6 @@ univ: $(SRCDIR)/main.rs
 dep:$(SDLLIB)
 
 test: $(SRCDIR)/tests.rs
-	rm test -f
 	rustc --test $< -o $@ -L $(SDLLIB) $(FLAGS)
 
 
@@ -27,4 +26,4 @@ depclean:
 clean:
 	rm -f univ test
 
-.PHONY: dep distclean clean test
+.PHONY: all dep distclean clean univ
