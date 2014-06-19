@@ -1,4 +1,4 @@
-use std::{f64, iter, rand};
+use std::{f64, iter, rand, fmt};
 
 static DT: f64 = 0.05;
 static EPS: f64 = 0.;
@@ -216,10 +216,10 @@ fn total_ke(particles: &Vec<Particle>) -> f64 {
     ke
 }
 
-fn print_state(particles: &Vec<Particle>) {
-    for &p in particles.iter() {
-        println!("x: {:0.2f}\ty: {:0.2f}\t xv: {:0.2f}\t yv: {:0.2f}\tr: {:0.2f}\tv {:0.2f}", 
-                p.pos.x, p.pos.y, p.vel.x, p.vel.y, p.pos.modulus(), p.vel.modulus())
+impl fmt::Show for Particle {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "PX:{:0.2f}\tPY:{:0.2f}\tVX:{:0.2f}\tVY:{:0.2f}\tMass:{:0.2f}\tKE:{:0.2f}",
+        self.pos.x, self.pos.y, self.vel.x, self.vel.y, self.mass, 
+        self.kinetic_energy())
     }
-    println!("KE: {:0.2f}", total_ke(particles));
 }

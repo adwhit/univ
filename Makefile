@@ -26,4 +26,4 @@ depclean:
 clean:
 	rm -f univ test
 
-.PHONY: all dep distclean clean univ
+.PHONY: all dep distclean clean univ test

@@ -1,4 +1,5 @@
 use physics::{Particle, PhysVec, force, stepvel};
+use std::fmt;
 
 struct Branch<'a> {
     tl : Box<Node<'a>>,
@@ -72,10 +73,11 @@ pub fn find_bounding_box(particles: &Vec<&Particle>) -> (f64, f64, f64, f64) {
 
 fn make_branch<'a>(particles: Vec<&'a Particle>, x: f64, y: f64, xvar: f64, yvar: f64) -> Branch<'a> {
     let (tla, tra, bla, bra) = partition(particles, x, y);
-    Branch { tl: box make_node(tla, x-xvar/2., y+yvar/2., xvar/2., yvar/2.),
+    Branch { 
+           tl: box make_node(tla, x-xvar/2., y+yvar/2., xvar/2., yvar/2.),
            tr: box make_node(tra, x+xvar/2., y+yvar/2., xvar/2., yvar/2.),
            bl: box make_node(bla, x-xvar/2., y-yvar/2., xvar/2., yvar/2.),
-           br: box make_node(bra, x-xvar/2., y+yvar/2., xvar/2., yvar/2.),
+           br: box make_node(bra, x+xvar/2., y-yvar/2., xvar/2., yvar/2.),
     }
 }
 
@@ -83,7 +85,6 @@ fn make_node<'a>(particles: Vec<&'a Particle>, x: f64, y: f64, xvar: f64, yvar: 
     let n = particles.len();
     if n > 1 { 
         let stats = calc_stats(&particles, x, y, xvar, yvar);
-        println!("{} {} {}",  stats.num_particles, stats.pos.x, stats.width);
         return Many(stats, make_branch(particles, x, y, xvar, yvar));
     } else if n == 1 {
         return One(*particles.get(0));
@@ -194,5 +195,12 @@ pub fn bh_stepsim(particles: &mut Vec<Particle>, lenp: uint, threshold: f64) {
     }
     for (p, &f) in particles.mut_iter().zip(frcs.iter()) {
         stepvel(p, f, true)
+    }
+}
+
+impl fmt::Show for BoxStats {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "X:{} Y:{} Width:{} Height:{} Mass:{} NumPcls: {}",
+        self.pos.x, self.pos.y, self.width, self.height, self.com.mass, self.num_particles)
     }
 }

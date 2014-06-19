@@ -30,8 +30,8 @@ fn test_bounding_box() {
 
 #[test]
 fn test_tree() {
-    let threshold = 2.0;
-    let pcls = dummy_particles(100);
+    let threshold = 1.0;
+    let pcls = dummy_particles(10);
     let pptrs = pcl_pointers(&pcls);
     let qt = QuadTree::new(pptrs, threshold);
     for (ix, p) in pcls.iter().enumerate() {
@@ -42,17 +42,7 @@ fn test_tree() {
                 frc.add(&force(p, q))
             }
         }
-        println!("ix: {:u} diff: {:f}%", ix, (frc.x - bhfrc.x)/frc.x*100.);
-        /*
-        if (frc.x - bhfrc.x)/frc.x > eps || (frc.x - bhfrc.x)/frc.x < -1.*eps {
-            println!("ix: {:u}, fx: {:f}", ix, bhfrc.x);
-            println!("ix: {:u}, fx: {:f}\n", ix, frc.x);
-        }
-        if (frc.y - bhfrc.y)/frc.y > eps || (frc.y - bhfrc.y)/frc.y < -1.*eps {
-            println!("ix: {:u}, fy: {:f}", ix, bhfrc.y);
-            println!("ix: {:u}, fy: {:f}\n", ix, frc.y);
-        }
-        */
+        println!("ix: {:u} diff: {:0.2f}%", ix, (frc.x - bhfrc.x)/frc.x*100.);
     }
 }
 

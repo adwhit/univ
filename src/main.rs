@@ -64,10 +64,9 @@ fn animate() {
     let centre1 = Particle { pos: PhysVec {x: 200., y:0.},
                          vel: PhysVec {x: 0., y:0.},
                          mass: 1000.};
-    let galaxy1 = physics::make_galaxy(physics::Random, centre1, 300., 1500);
+    let galaxy1 = physics::make_galaxy(physics::Circular, centre1, 300., 100);
     let mut particles : Vec<Particle> = Vec::new();
     particles.push_all(galaxy1.as_slice());
-
     let lenp = particles.len();
     let mut framect = 0;
     let pixels : ~[u8] = ~[0,..NBYTES*WIDTH*HEIGHT];
@@ -75,8 +74,8 @@ fn animate() {
     renderer.clear();
     loop {
         renderer.clear();
-        //physics::stepsim(&mut particles, lenp);
-        barneshut::bh_stepsim(&mut particles, lenp, 1.0);
+        physics::stepsim(&mut particles, lenp);
+        //barneshut::bh_stepsim(&mut particles, lenp, 1.0);
         let points = pcls2points(&particles);
         renderer.draw_points(points.as_slice());
         renderer.present();
@@ -97,8 +96,6 @@ fn animate() {
 fn get_renderer() -> sdl2::render::Renderer<sdl2::video::Window> {
     sdl2::render::Renderer::new_with_window(WIDTH as int, HEIGHT as int, sdl2::video::FullscreenDesktop).unwrap()
 }
-
-
 
 fn main() {
     animate();
