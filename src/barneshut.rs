@@ -30,12 +30,12 @@ struct BoxStats {
     num_particles: uint
 }
 
-struct QuadTree<'a> {
-    root: Node<'a>
+pub struct QuadTree<'a> {
+    pub root: Node<'a>
 }
 
 impl<'a> QuadTree<'a> {
-    fn new<'a> (particles: Vec<&'a Particle>) -> QuadTree<'a> {
+    pub fn new<'a> (particles: Vec<&'a Particle>) -> QuadTree<'a> {
         let (xmax, xmin, ymax, ymin) = find_bounding_box(&particles);
         let x = xmax + xmin / 2.0;
         let y = ymax + ymin / 2.0;
@@ -51,11 +51,11 @@ impl<'a> QuadTree<'a> {
     }
 
     fn force(&self, p: &Particle) -> Option<PhysVec> {
-        calc_force(p, self.root, 0.5)
+        bh_force(p, &self.root, 0.5)
     }
 }
 
-fn find_bounding_box(particles: &Vec<&Particle>) -> (f64, f64, f64, f64) {
+pub fn find_bounding_box(particles: &Vec<&Particle>) -> (f64, f64, f64, f64) {
     let mut xmax = Float::neg_infinity(); let mut ymax = Float::neg_infinity();
     let mut xmin = Float::infinity();     let mut ymin = Float::infinity();
     for p in particles.iter() {
@@ -136,11 +136,11 @@ fn calc_stats(particles: &Vec<&Particle>, x: f64, y:f64, xvar:f64, yvar:f64) -> 
 }
 
 
-fn calc_force(p: &Particle, node: Node, threshold: f64) -> Option<PhysVec> {
-    match node {
-        One(p2) => return Some(force(p, p2)),
+pub fn bh_force(p: &Particle, node: &Node, threshold: f64) -> Option<PhysVec> {
+    match *node {
+        One(p2) => if p == p2 { return None } else { return Some(force(p, p2)) } ,
         Zero    => return None,
-        Many(stats, branch) => {
+        Many(stats,ref branch) => {
 
             if p.pos.diff(stats.com.pos).modulus()/stats.width > threshold {
                 return Some(force(p, &stats.com))
@@ -151,21 +151,21 @@ fn calc_force(p: &Particle, node: Node, threshold: f64) -> Option<PhysVec> {
     }
 }
 
-fn force_branch(p: &Particle, branch: Branch, threshold: f64) -> PhysVec {
+fn force_branch(p: &Particle, branch: &Branch, threshold: f64) -> PhysVec {
     let mut tot_force = PhysVec { x: 0., y: 0. };
-    match calc_force(p, *branch.tl, threshold) {
+    match bh_force(p, branch.tl, threshold) {
         Some(v) => tot_force.add(&v),
         None => ()
     }
-    match calc_force(p, *branch.tr, threshold) {
+    match bh_force(p, branch.tr, threshold) {
         Some(v) => tot_force.add(&v),
         None => ()
     }
-    match calc_force(p, *branch.bl, threshold) {
+    match bh_force(p, branch.bl, threshold) {
         Some(v) => tot_force.add(&v),
         None => ()
     }
-    match calc_force(p, *branch.br, threshold) {
+    match bh_force(p, branch.br, threshold) {
         Some(v) => tot_force.add(&v),
         None => ()
     }
@@ -173,49 +173,3 @@ fn force_branch(p: &Particle, branch: Branch, threshold: f64) -> PhysVec {
 }
 
 
-#[cfg(test)]
-mod bhtests {
-
-    use barneshut::{find_bounding_box, create_tree, calc_force};
-    use physics::{Particle, PhysVec};
-
-    fn dummy_particles() -> Vec<Particle> {
-        let mut v : Vec<Particle> = Vec::new();
-        for x in range(0,100000) {
-            v.push( Particle { pos: PhysVec { x: x as f64, y: x as f64 + 1.5 },
-                               vel: PhysVec { x: x as f64, y: x as f64 },
-                               mass: x as f64
-                             } )
-        }
-        v
-    }
-
-    fn dummy_pointers<'a>(particles: &'a Vec<Particle>) -> Vec<&'a Particle> {
-        let mut v : Vec<&Particle> = Vec::new();
-        for p in particles.iter() {
-            v.push(p)
-        }
-        v
-    }
-
-    //#[test]
-    fn test_bounding_box() {
-        let v = dummy_particles();
-        let vp = dummy_pointers(&v);
-        let (xmax, xmin, ymax, ymin) = find_bounding_box(&vp);
-        assert!(xmax == 99.0)
-        assert!(ymax == 100.5)
-        assert!(xmin == 0.)
-        assert!(ymin == 1.5)
-    }
-
-    #[test]
-    fn test_tree() {
-        let v = dummy_particles();
-        let vp = dummy_pointers(&v);
-        let qt = create_tree(vp);
-        for p in v.iter() {
-            calc_force(p, qt.root, 0.5);
-        }
-    }
-}

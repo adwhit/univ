@@ -10,7 +10,7 @@ univ: $(SRCDIR)/main.rs
 
 dep:$(SDLLIB)
 
-test: $(SRCDIR)/main.rs
+test: $(SRCDIR)/tests.rs
 	rm test -f
 	rustc --test $< -o $@ -L $(SDLLIB) $(FLAGS)
 
