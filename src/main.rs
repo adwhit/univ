@@ -61,10 +61,10 @@ fn pcls2points(particles: &Vec<Particle>) -> Vec<Point> {
 fn animate() {
     let renderer = get_renderer();
 
-    let centre1 = Particle { pos: PhysVec {x: 200., y:0.},
+    let centre1 = Particle { pos: PhysVec {x: 0., y:0.},
                          vel: PhysVec {x: 0., y:0.},
-                         mass: 1000.};
-    let galaxy1 = physics::make_galaxy(physics::Circular, centre1, 300., 100);
+                         mass: 100.};
+    let galaxy1 = physics::make_galaxy(physics::Random, centre1, 800., 20000);
     let mut particles : Vec<Particle> = Vec::new();
     particles.push_all(galaxy1.as_slice());
     let lenp = particles.len();
@@ -74,8 +74,8 @@ fn animate() {
     renderer.clear();
     loop {
         renderer.clear();
-        physics::stepsim(&mut particles, lenp);
-        //barneshut::bh_stepsim(&mut particles, lenp, 1.0);
+        //physics::stepsim(&mut particles, lenp);
+        barneshut::bh_stepsim(&mut particles, lenp, 0.5);
         let points = pcls2points(&particles);
         renderer.draw_points(points.as_slice());
         renderer.present();

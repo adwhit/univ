@@ -194,7 +194,8 @@ pub fn bh_stepsim(particles: &mut Vec<Particle>, lenp: uint, threshold: f64) {
         }
     }
     for (p, &f) in particles.mut_iter().zip(frcs.iter()) {
-        stepvel(p, f, true)
+        stepvel(p, f, true);
+        p.steppos();
     }
 }
 

@@ -61,7 +61,7 @@ impl Particle {
         0.5 * ((self.vel.x * self.vel.x) + (self.vel.y * self.vel.y)) * self.mass
     }
 
-    fn steppos(&mut self) {
+    pub fn steppos(&mut self) {
         self.pos.x = self.pos.x + self.vel.x*DT;
         self.pos.y = self.pos.y + self.vel.y*DT;
     }
