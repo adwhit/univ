@@ -8,7 +8,7 @@ screenheight = 1024
 simtype = "barnes-hut"      # simtypes: classical or barnes-hut
 threshold = 1.0
 
-[galaxy]
+[[galaxy]]
 posx = 0.0
 posy = 0.0
 velx = 0.0

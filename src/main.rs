@@ -4,7 +4,7 @@ extern crate toml = "rust-toml";
 use sdl2::rect::Point;
 use sdl2::pixels::{RGB, RGBA};
 use std::rand;
-use physics::{Particle, PhysVec, Galaxy};
+use physics::{Particle, PhysVec, GalaxyCfg};
 
 mod physics;
 mod barneshut;
@@ -18,7 +18,7 @@ struct Config {
     width:    uint,
     height:   uint,
     nbytes:   uint,
-    galaxies: Vec<Galaxy>,
+    galaxies: Vec<GalaxyCfg>,
     sim:      SimType
 }
 
@@ -71,7 +71,7 @@ fn pcls2points(particles: &Vec<Particle>) -> Vec<Point> {
 }
 
 fn init_particles(cfg: Config) ->  (Vec<Particle>, fn(&mut Vec<Particle>)) {
-    let g = Galaxy {
+    let g = GalaxyCfg {
         posx: 0.0,
         posy: 0.0,
         velx: 0.0,
@@ -121,16 +121,24 @@ fn get_renderer() -> sdl2::render::Renderer<sdl2::video::Window> {
     sdl2::render::Renderer::new_with_window(WIDTH as int, HEIGHT as int, sdl2::video::FullscreenDesktop).unwrap()
 }
 
+fn config_helper_int(root: toml::Value, lookup: &str, default: i64) -> i64 {
+    match root.lookup(lookup) {
+        Some(v) => v.get_int().unwrap(),
+        None    => default
+    }
+}
+
+fn config_helper_float(root: toml::Value, lookup: &str, default: f64) -> f64 {
+    match root.lookup(lookup) {
+        Some(v) => v.get_float().unwrap(),
+        None    => default
+    }
+}
+
 fn configure(path: &str) -> Config {
     let root = toml::parse_from_file(path).unwrap();
-    let width = match root.lookup("global.screenwidth") {
-        Some(v) => v.get_int().unwrap(),
-        None    => 2048
-    };
-    let height = match root.lookup("global.screenheight") {
-        Some(v) => v.get_int().unwrap(),
-        None    => 1024
-    };
+    let width = config_helper_int( root, "global.screenwidth",  2048);
+    let height = config_helper_int(root, "global.screenheight", 1024);
     let simtype = match root.lookup("physics.simtype") {
         Some(v) => { 
             let sim = v.get_str().unwrap();
@@ -140,11 +148,39 @@ fn configure(path: &str) -> Config {
         },
         None    => BarnesHut
     };
-    Config { width: width as uint, height: height as uint, nbytes: 4, sim: simtype }
+    Config { 
+        width: width as uint, 
+        height: height as uint, 
+        nbytes: 4, 
+        galaxies: galaxy_configure(root),
+        sim: simtype }
+}
+
+fn galaxy_configure(root: toml::Value) -> Vec<GalaxyCfg> {
+    let galaxies : Vec<GalaxyCfg> = Vec::new();
+    let gal_ix = 0;
+    loop {
+
+        galaxies.push( GalaxyCfg {
+                posx : config_helper_float(root, format!("galaxy.{:d}.posx", gal_ix), 0.0),
+                posy : config_helper_float(root, format!("galaxy.{:d}.posy", gal_ix), 0.0),
+                velx : config_helper_float(root, format!("galaxy.{:d}.velx", gal_ix), 0.0),
+                vely : config_helper_float(root, format!("galaxy.{:d}.vely", gal_ix), 0.0),
+                radius : config_helper_float(root, format!("galaxy.{:d}.radius", gal_ix), 300.0),
+                nstars : config_helper_int(root, format!("galaxy.{:d}.nstars", gal_ix), 500),
+                central_mass : config_helper_float(root, format!("galaxy.{:d}.central_mass", gal_ix), 1000.0),
+                other_mass : config_helper_float(root, format!("galaxy.{:d}.other_mass", gal_ix), 1.0),
+                shape: shape,
+                kinetics: kinetics });
+        gal_ix += 1;
+        break;
+    }
+    galaxies
 }
 
 fn main() {
     let cfg = configure("config/cfg.toml".as_slice());
-    let (particles, stepfn) = init_particles(cfg);
-    animate(particles, stepfn);
+    println!("{}", cfg);
+    //let (particles, stepfn) = init_particles(cfg);
+    //animate(particles, stepfn);
 }

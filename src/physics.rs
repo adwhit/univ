@@ -31,7 +31,7 @@ pub enum GalaxyKinetics {
     ZeroVel,
 }
 
-pub struct Galaxy {
+pub struct GalaxyCfg {
     pub posx: f64,
     pub posy: f64,
     pub velx: f64,
@@ -141,7 +141,7 @@ fn galilean_offset(particles: &mut Vec<Particle>, central_pcl: &Particle) {
     }
 }
 
-pub fn make_galaxy(gal: Galaxy) -> Vec<Particle> {
+pub fn make_galaxy(gal: GalaxyCfg) -> Vec<Particle> {
     let central_pcl = Particle { 
         pos: PhysVec { x: gal.posx, y: gal.posy },
         vel: PhysVec { x: gal.velx, y: gal.vely },
