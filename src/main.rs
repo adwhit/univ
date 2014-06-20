@@ -1,6 +1,6 @@
 extern crate sdl2;
+extern crate time;
 extern crate toml = "rust-toml";
-extern crate debug;
 
 use sdl2::rect::Point;
 use physics::{Particle, GalaxyCfg};
@@ -15,9 +15,11 @@ enum SimType {
 
 struct Config {
     display :  Display,
-    galaxies: Vec<GalaxyCfg>,
-    sim:      SimType,
-    threshold:f64
+    galaxies:  Vec<GalaxyCfg>,
+    sim:       SimType,
+    threshold: f64,
+    dt       : f64
+
 }
 
 struct Display {
@@ -49,8 +51,9 @@ fn init_particles(cfg: &Config) ->  (Vec<Particle>, fn(&mut Vec<Particle>)) {
 
 fn animate(mut particles: Vec<Particle>, stepfn: fn(&mut Vec<Particle>), display: Display ) {
     let renderer = get_renderer(display);
-    let mut framect = 0;
     renderer.clear();
+    let mut framect = 0;
+    let starttime = time::precise_time_s();
     loop {
         renderer.clear();
         stepfn(&mut particles);
@@ -68,7 +71,9 @@ fn animate(mut particles: Vec<Particle>, stepfn: fn(&mut Vec<Particle>), display
             _ => {}
         }
     }
+    let endtime = time::precise_time_s();
     sdl2::quit();
+    println!("Avg FPS: {}", framect as f64 / (endtime - starttime) as f64)
 }
 
 fn get_renderer(display: Display) -> sdl2::render::Renderer<sdl2::video::Window> {
@@ -93,7 +98,6 @@ fn configure(path: &str) -> Config {
     let root = toml::parse_from_file(path).unwrap();
     let width = config_helper_int( &root, "display.screenwidth",  2048);
     let height = config_helper_int(&root, "display.screenheight", 1024);
-    let threshold = config_helper_float(&root, "physics.threshold", 1.0);
     let simtype = match root.lookup("physics.simtype") {
         Some(v) => { 
             let sim = v.get_str().unwrap();
@@ -107,7 +111,8 @@ fn configure(path: &str) -> Config {
         display:  Display { width: width as uint, height: height as uint }, 
         galaxies: galaxy_configure(&root),
         sim:      simtype,
-        threshold:threshold
+        threshold:config_helper_float(&root, "physics.threshold", 1.0),
+        dt:       config_helper_float(&root, "physics.dt", 0.1)
     }
 }
 
@@ -116,7 +121,7 @@ fn galaxy_configure(root: &toml::Value) -> Vec<GalaxyCfg> {
     let mut gal_ix = 0;
     loop {
         //nstars is only mandatory configuration argument
-        let nstars = match root.lookup(format!("galaxy.{:d}.nstars", gal_ix).as_slice()) {
+        let nbody = match root.lookup(format!("galaxy.{:d}.nbody", gal_ix).as_slice()) {
             Some(v) => v.get_int().unwrap() as uint,
             None    => break
         };
@@ -153,7 +158,7 @@ fn galaxy_configure(root: &toml::Value) -> Vec<GalaxyCfg> {
                 velx : config_helper_float(root, format!("galaxy.{:d}.velx", gal_ix).as_slice(), 0.0),
                 vely : config_helper_float(root, format!("galaxy.{:d}.vely", gal_ix).as_slice(), 0.0),
                 radius : config_helper_float(root, format!("galaxy.{:d}.radius", gal_ix).as_slice(), 300.0),
-                nstars : nstars,
+                nbody : nbody,
                 central_mass : config_helper_float(root, format!("galaxy.{:d}.centralmass", gal_ix).as_slice(), 1000.0),
                 other_mass : config_helper_float(root, format!("galaxy.{:d}.othermass", gal_ix).as_slice(), 1.0),
                 shape: shape,
@@ -166,6 +171,7 @@ fn galaxy_configure(root: &toml::Value) -> Vec<GalaxyCfg> {
 fn main() {
     let cfg = configure("config/cfg.toml".as_slice());
     unsafe {barneshut::THRESH = cfg.threshold};
+    unsafe {physics::DT = cfg.dt};
     let (particles, stepfn) = init_particles(&cfg);
     animate(particles, stepfn, cfg.display);
 }

@@ -1,7 +1,7 @@
 use std::{f64, iter, rand, fmt};
 use std::iter::AdditiveIterator;
 
-static DT: f64 = 0.05;
+pub static mut DT: f64 = 0.05;
 static EPS: f64 = 0.;
 
 #[deriving(PartialEq)]
@@ -37,7 +37,7 @@ pub struct GalaxyCfg {
     pub velx: f64,
     pub vely: f64,
     pub radius: f64,
-    pub nstars: uint,
+    pub nbody: uint,
     pub shape: GalaxyShape,
     pub kinetics: GalaxyKinetics,
     pub central_mass: f64,
@@ -83,8 +83,10 @@ impl Particle {
     }
 
     pub fn steppos(&mut self) {
-        self.pos.x = self.pos.x + self.vel.x*DT;
-        self.pos.y = self.pos.y + self.vel.y*DT;
+        unsafe {
+            self.pos.x = self.pos.x + self.vel.x*DT;
+            self.pos.y = self.pos.y + self.vel.y*DT;
+        }
     }
 
 }
@@ -99,16 +101,16 @@ pub fn force(p1: &Particle, p2: &Particle) -> PhysVec {
 }
 
 
-fn spawn_circular_galaxy(max_radius: f64, nrings: uint, num_stars: uint) -> Vec<Particle> {
-    //create galaxy with concentric equally-spaced rings. The number of stars in each ring is proportional
+fn spawn_circular_galaxy(max_radius: f64, nrings: uint, num_bodys: uint) -> Vec<Particle> {
+    //create galaxy with concentric equally-spaced rings. The number of bodys in each ring is proportional
     //to the square of the radius of the ring
     let mut particles: Vec<Particle> = Vec::new();
     let pi =  f64::consts::PI;
     let nsqr = Vec::from_fn(nrings, |ix| (ix+1)*(ix+1));
     let sum_sqr = nsqr.iter().map(|&x| x).sum() as f64;
-    let nstars: Vec<int> = nsqr.iter().map(|x| ((x*num_stars) as f64 /sum_sqr) as int).collect();
+    let nbody: Vec<int> = nsqr.iter().map(|x| ((x*num_bodys) as f64 /sum_sqr) as int).collect();
     let radii: Vec<f64> = Vec::from_fn(nrings,|ix| max_radius/(nrings as f64)*(ix as f64 + 1.0));
-    for (&n, &r) in nstars.iter().zip(radii.iter()) {
+    for (&n, &r) in nbody.iter().zip(radii.iter()) {
         for i in iter::range_inclusive(1, n) {
             let theta = (i as f64)/(n as f64)*2.0*pi;
             particles.push(Particle {pos:PhysVec {x: r*theta.cos(), y: r*theta.sin() }, 
@@ -119,10 +121,10 @@ fn spawn_circular_galaxy(max_radius: f64, nrings: uint, num_stars: uint) -> Vec<
     particles
 }
 
-fn spawn_random_galaxy(radius: f64, num_stars: uint) -> Vec<Particle> {
+fn spawn_random_galaxy(radius: f64, num_bodys: uint) -> Vec<Particle> {
     let pi =  f64::consts::PI;
     let mut particles: Vec<Particle> = Vec::new();
-    for _ in range(0,num_stars) {
+    for _ in range(0,num_bodys) {
         let theta = rand::random::<f64>()*2.0*pi;
         let r = rand::random::<f64>()*radius;
         let x =  r*theta.cos();
@@ -149,8 +151,8 @@ pub fn make_galaxy(gal: GalaxyCfg) -> Vec<Particle> {
         mass: gal.central_mass
     };
     let mut particles = match gal.shape {
-        RandomRadius => spawn_random_galaxy(gal.radius, gal.nstars),
-        Concentric(nrings) => spawn_circular_galaxy(gal.radius, nrings, gal.nstars)
+        RandomRadius => spawn_random_galaxy(gal.radius, gal.nbody),
+        Concentric(nrings) => spawn_circular_galaxy(gal.radius, nrings, gal.nbody)
     };
 
     match gal.kinetics {
@@ -204,12 +206,14 @@ fn init_circular_orbits(particles: &mut Vec<Particle>, central_mass: f64) {
 }
 
 pub fn stepvel(p: &mut Particle, force: PhysVec, sense:bool) {
-    if sense {
-        p.vel.x += force.x/p.mass*DT;
-        p.vel.y += force.y/p.mass*DT;
-    } else {
-        p.vel.x -= force.x/p.mass*DT;
-        p.vel.y -= force.y/p.mass*DT;
+    unsafe {
+        if sense {
+            p.vel.x += force.x/p.mass*DT;
+            p.vel.y += force.y/p.mass*DT;
+        } else {
+            p.vel.x -= force.x/p.mass*DT;
+            p.vel.y -= force.y/p.mass*DT;
+        }
     }
 }
 
