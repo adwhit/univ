@@ -1,4 +1,5 @@
 use std::{f64, iter, rand, fmt};
+use std::iter::AdditiveIterator;
 
 static DT: f64 = 0.05;
 static EPS: f64 = 0.;
@@ -18,9 +19,29 @@ pub struct PhysVec {
     pub y : f64
 }
 
-pub enum Galaxy {
-    Random,
-    Circular
+//Represents internal shape of galaxy
+pub enum GalaxyShape {
+    RandomRadius,
+    CircularRadius(uint)
+}
+
+pub enum GalaxyKinetics {
+    RandomVel(f64, f64),
+    CircularOrbit,
+    ZeroVel,
+}
+
+pub struct Galaxy {
+    pub posx: f64,
+    pub posy: f64,
+    pub velx: f64,
+    pub vely: f64,
+    pub radius: f64,
+    pub nstars: uint,
+    pub shape: GalaxyShape,
+    pub kinetics: GalaxyKinetics,
+    pub central_mass: f64,
+    pub other_mass: f64
 }
 
 impl PhysVec {
@@ -78,15 +99,14 @@ pub fn force(p1: &Particle, p2: &Particle) -> PhysVec {
 }
 
 
-fn spawn_circular_galaxy(max_radius: f64, num_stars: int) -> Vec<Particle> {
+fn spawn_circular_galaxy(max_radius: f64, nrings: uint, num_stars: uint) -> Vec<Particle> {
     let mut particles: Vec<Particle> = Vec::new();
     let pi =  f64::consts::PI;
-    // n planets at radius r
-    let ns = [0.1,0.2,0.3,0.4];
-    let rs = [0.2,0.5,0.7,1.0];
-    //let ns = [1.];
-    //let rs = [1.];
-    for (&nfrac, &rfrac) in ns.iter().zip(rs.iter()) {
+    let nsqr = Vec::from_fn(nrings, |ix| ix*ix);
+    let sum_sqr = nsqr.iter().map(|&x| x).sum() as f64;
+    let nstars: Vec<f64> = nsqr.iter().map(|x| (x*num_stars) as f64 /sum_sqr).collect();
+    let radii: Vec<f64> = Vec::from_fn(nrings,|ix| max_radius/(nrings as f64)*(ix as f64 + 1.0));
+    for (&nfrac, &rfrac) in nstars.iter().zip(radii.iter()) {
         let n = (nfrac * num_stars as f64) as int;
         let r = rfrac * max_radius;
         for i in iter::range_inclusive(1, n) {
@@ -99,7 +119,7 @@ fn spawn_circular_galaxy(max_radius: f64, num_stars: int) -> Vec<Particle> {
     particles
 }
 
-fn spawn_random_galaxy(radius: f64, num_stars: int) -> Vec<Particle> {
+fn spawn_random_galaxy(radius: f64, num_stars: uint) -> Vec<Particle> {
     let mut particles: Vec<Particle> = Vec::new();
     for _ in range(0,num_stars) {
         let theta = rand::random::<f64>()*360.;
@@ -113,27 +133,42 @@ fn spawn_random_galaxy(radius: f64, num_stars: int) -> Vec<Particle> {
     particles
 }
 
-fn offset(particles: &mut Vec<Particle>, central_pcl: &Particle) {
+fn galilean_offset(particles: &mut Vec<Particle>, central_pcl: &Particle) {
+    //offset all particles by given position velocity
     for p in particles.mut_iter() {
         p.pos.add(&central_pcl.pos);
         p.vel.add(&central_pcl.vel);
     }
 }
 
-pub fn make_galaxy(shape: Galaxy, central_pcl : Particle, radius: f64, num_stars: int) -> Vec<Particle> {
-    let mut particles = match shape {
-        Random => spawn_random_galaxy(radius, num_stars),
-        Circular => spawn_circular_galaxy(radius, num_stars)
+pub fn make_galaxy(gal: Galaxy) -> Vec<Particle> {
+    let central_pcl = Particle { 
+        pos: PhysVec { x: gal.posx, y: gal.posy },
+        vel: PhysVec { x: gal.velx, y: gal.vely },
+        mass: gal.central_mass
     };
-    init_velocity(&mut particles, central_pcl.mass);
-    offset(&mut particles, &central_pcl);
+    let mut particles = match gal.shape {
+        RandomRadius => spawn_random_galaxy(gal.radius, gal.nstars),
+        CircularRadius(nrings) => spawn_circular_galaxy(gal.radius, nrings, gal.nstars)
+    };
+
+    match gal.kinetics {
+        ZeroVel               => (),
+        RandomVel(minv, maxv) => init_random_vel(&mut particles, minv, maxv),
+        CircularOrbits        => init_circular_orbits(&mut particles, central_pcl.mass)
+    }
+    galilean_offset(&mut particles, &central_pcl);
     particles.push(central_pcl);
     particles
 }
 
-fn init_velocity(particles: &mut Vec<Particle>, central_mass: f64) {
-    let mut vels : Vec<PhysVec> = Vec::new();
+fn init_random_vel(particles: &mut Vec<Particle>, minv: f64, maxv: f64) {
+    fail!("Not yet implemented");
+}
 
+fn init_circular_orbits(particles: &mut Vec<Particle>, central_mass: f64) {
+    //Calculate force and velocities to create a circular orbit
+    let mut vels : Vec<PhysVec> = Vec::new();
     // need to make dummy since we are initialising centred on zero
     let dummy_central_pcl = Particle { pos: PhysVec {x:0., y:0.},
                                        vel: PhysVec {x:0., y:0.},

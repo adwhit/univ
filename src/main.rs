@@ -4,11 +4,17 @@ extern crate toml = "rust-toml";
 use sdl2::rect::Point;
 use sdl2::pixels::{RGB, RGBA};
 use std::rand;
-use physics::{Particle, PhysVec};
+use physics::{Particle, PhysVec, Galaxy};
 
 mod physics;
 mod barneshut;
 
+struct Config {
+    width: uint,
+    height: uint,
+    nbytes: uint,
+    galaxies: Vec<Galaxy>
+}
 
 static WIDTH: uint = 2048;
 static HEIGHT: uint = 1400;
@@ -61,10 +67,20 @@ fn pcls2points(particles: &Vec<Particle>) -> Vec<Point> {
 fn animate() {
     let renderer = get_renderer();
 
-    let centre1 = Particle { pos: PhysVec {x: 0., y:0.},
-                         vel: PhysVec {x: 0., y:0.},
-                         mass: 100.};
-    let galaxy1 = physics::make_galaxy(physics::Random, centre1, 600., 10000);
+    let g = Galaxy {
+        posx: 0.0,
+        posy: 0.0,
+        velx: 0.0,
+        vely: 0.0,
+        radius: 300.,
+        nstars: 500,
+        shape:  physics::RandomRadius,
+        kinetics: physics::CircularOrbit,
+        central_mass: 500.,
+        other_mass: 1.
+    };
+
+    let galaxy1 = physics::make_galaxy(g);
     let mut particles : Vec<Particle> = Vec::new();
     particles.push_all(galaxy1.as_slice());
 

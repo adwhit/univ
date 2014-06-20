@@ -25,13 +25,13 @@ $(SDLLIB): $(SDLDIR)
 $(TOMLLIB): $(TOMLDIR)
 	cd $(TOMLDIR); make
 
-$(SDLDIR):
+depinit:
 	git submodule init; git submodule update
 
 depclean:
-	rm -rf lib
+	rm -rf $(LIBDIR)/*
 
 clean:
 	rm -f univ test
 
-.PHONY: all dep distclean clean univ test
+.PHONY: all dep depinit distclean clean univ test
