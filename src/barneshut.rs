@@ -1,6 +1,8 @@
 use physics::{Particle, PhysVec, force, stepvel};
 use std::fmt;
 
+static THRESH : f64 = 1.0;
+
 struct Branch<'a> {
     tl : Box<Node<'a>>,
     tr : Box<Node<'a>>,
@@ -32,12 +34,11 @@ struct BoxStats {
 }
 
 pub struct QuadTree<'a> {
-    pub root: Node<'a>,
-    pub threshold: f64
+    pub root: Node<'a>
 }
 
 impl<'a> QuadTree<'a> {
-    pub fn new<'a> (particles: Vec<&'a Particle>, threshold: f64) -> QuadTree<'a> {
+    pub fn new<'a> (particles: Vec<&'a Particle>) -> QuadTree<'a> {
         let (xmax, xmin, ymax, ymin) = find_bounding_box(&particles);
         let x = xmax + xmin / 2.0;
         let y = ymax + ymin / 2.0;
@@ -49,13 +50,11 @@ impl<'a> QuadTree<'a> {
         } else {
             xvar = yvar
         }
-        QuadTree { root: make_node(particles, x, y, xvar, yvar),
-                   threshold: threshold
-        }
+        QuadTree { root: make_node(particles, x, y, xvar, yvar) }
     }
 
     pub fn force(&self, p: &Particle) -> PhysVec {
-        bh_force(p, &self.root, self.threshold).unwrap()
+        bh_force(p, &self.root).unwrap()
     }
 }
 
@@ -140,35 +139,35 @@ fn calc_stats(particles: &Vec<&Particle>, x: f64, y:f64, xvar:f64, yvar:f64) -> 
 }
 
 
-pub fn bh_force(p: &Particle, node: &Node, threshold: f64) -> Option<PhysVec> {
+pub fn bh_force(p: &Particle, node: &Node) -> Option<PhysVec> {
     match *node {
         One(p2) => if p == p2 { return None } else { return Some(force(p, p2)) } ,
         Zero    => return None,
         Many(stats,ref branch) => {
-            if p.pos.diff(stats.com.pos).modulus()/stats.width > threshold {
+            if p.pos.diff(stats.com.pos).modulus()/stats.width > THRESH {
                 return Some(force(p, &stats.com))
             } else {
-                return Some(force_branch(p, branch, threshold))
+                return Some(force_branch(p, branch))
             }
         }
     }
 }
 
-fn force_branch(p: &Particle, branch: &Branch, threshold: f64) -> PhysVec {
+fn force_branch(p: &Particle, branch: &Branch) -> PhysVec {
     let mut tot_force = PhysVec { x: 0., y: 0. };
-    match bh_force(p, branch.tl, threshold) {
+    match bh_force(p, branch.tl) {
         Some(v) => tot_force.add(&v),
         None => ()
     }
-    match bh_force(p, branch.tr, threshold) {
+    match bh_force(p, branch.tr) {
         Some(v) => tot_force.add(&v),
         None => ()
     }
-    match bh_force(p, branch.bl, threshold) {
+    match bh_force(p, branch.bl) {
         Some(v) => tot_force.add(&v),
         None => ()
     }
-    match bh_force(p, branch.br, threshold) {
+    match bh_force(p, branch.br) {
         Some(v) => tot_force.add(&v),
         None => ()
     }
@@ -184,11 +183,11 @@ pub fn pcl_pointers<'a>(particles: &'a Vec<Particle>) -> Vec<&'a Particle> {
 }
 
 
-pub fn bh_stepsim(particles: &mut Vec<Particle>, lenp: uint, threshold: f64) {
-    let mut frcs : Vec<PhysVec> =  Vec::with_capacity(lenp);
+pub fn stepsim(particles: &mut Vec<Particle>) {
+    let mut frcs : Vec<PhysVec> =  Vec::with_capacity(particles.len());
     {
         let pcl_ptrs = pcl_pointers(particles);
-        let qt = QuadTree::new(pcl_ptrs, threshold);
+        let qt = QuadTree::new(pcl_ptrs);
         for p in particles.iter() {
             frcs.push(qt.force(p));
         }

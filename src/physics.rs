@@ -22,7 +22,7 @@ pub struct PhysVec {
 //Represents internal shape of galaxy
 pub enum GalaxyShape {
     RandomRadius,
-    CircularRadius(uint)
+    Concentric(uint)
 }
 
 pub enum GalaxyKinetics {
@@ -149,7 +149,7 @@ pub fn make_galaxy(gal: Galaxy) -> Vec<Particle> {
     };
     let mut particles = match gal.shape {
         RandomRadius => spawn_random_galaxy(gal.radius, gal.nstars),
-        CircularRadius(nrings) => spawn_circular_galaxy(gal.radius, nrings, gal.nstars)
+        Concentric(nrings) => spawn_circular_galaxy(gal.radius, nrings, gal.nstars)
     };
 
     match gal.kinetics {
@@ -228,7 +228,8 @@ pub fn stepvel(p: &mut Particle, force: PhysVec, sense:bool) {
     }
 }
 
-pub fn stepsim(particles: &mut Vec<Particle>, lenp: uint) {
+pub fn stepsim(particles: &mut Vec<Particle>) {
+    let lenp = particles.len();
     for i in range(0, lenp) {
         for j in range(i+1, lenp) {
             if i != j {

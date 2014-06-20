@@ -9,11 +9,17 @@ use physics::{Particle, PhysVec, Galaxy};
 mod physics;
 mod barneshut;
 
+enum SimType {
+    BarnesHut,
+    Classical
+}
+
 struct Config {
-    width: uint,
-    height: uint,
-    nbytes: uint,
-    galaxies: Vec<Galaxy>
+    width:    uint,
+    height:   uint,
+    nbytes:   uint,
+    galaxies: Vec<Galaxy>,
+    sim:      SimType
 }
 
 static WIDTH: uint = 2048;
@@ -64,9 +70,7 @@ fn pcls2points(particles: &Vec<Particle>) -> Vec<Point> {
     arr
 }
 
-fn animate() {
-    let renderer = get_renderer();
-
+fn init_particles(cfg: Config) ->  (Vec<Particle>, fn(&mut Vec<Particle>)) {
     let g = Galaxy {
         posx: 0.0,
         posy: 0.0,
@@ -75,23 +79,27 @@ fn animate() {
         radius: 300.,
         nstars: 500,
         shape:  physics::RandomRadius,
-        kinetics: physics::CircularOrbit,
+        kinetics: physics::ZeroVel,
         central_mass: 500.,
         other_mass: 1.
     };
-
     let galaxy1 = physics::make_galaxy(g);
     let mut particles : Vec<Particle> = Vec::new();
     particles.push_all(galaxy1.as_slice());
+    match cfg.sim {
+        BarnesHut => return (particles, barneshut::stepsim),
+        Classical => return (particles, physics::stepsim),
+    }
+}
 
+fn animate(particles: Vec<Particle>, stepfn: fn(&mut Vec<Particle>) ) {
     let lenp = particles.len();
+    let renderer = get_renderer();
     let mut framect = 0;
-
     renderer.clear();
     loop {
         renderer.clear();
-        //physics::stepsim(&mut particles, lenp);
-        barneshut::bh_stepsim(&mut particles, lenp, 1.0);
+        stepfn(&mut particles);
         let points = pcls2points(&particles);
         renderer.draw_points(points.as_slice());
         renderer.present();
@@ -113,6 +121,30 @@ fn get_renderer() -> sdl2::render::Renderer<sdl2::video::Window> {
     sdl2::render::Renderer::new_with_window(WIDTH as int, HEIGHT as int, sdl2::video::FullscreenDesktop).unwrap()
 }
 
+fn configure(path: &str) -> Config {
+    let root = toml::parse_from_file(path).unwrap();
+    let width = match root.lookup("global.screenwidth") {
+        Some(v) => v.get_int().unwrap(),
+        None    => 2048
+    };
+    let height = match root.lookup("global.screenheight") {
+        Some(v) => v.get_int().unwrap(),
+        None    => 1024
+    };
+    let simtype = match root.lookup("physics.simtype") {
+        Some(v) => { 
+            let sim = v.get_str().unwrap();
+            if sim.equiv(&"barnes-hut") { BarnesHut }
+            else if sim.equiv(&"classical") { Classical }
+            else { fail!("Error - {} not recognized", sim) }
+        },
+        None    => BarnesHut
+    };
+    Config { width: width as uint, height: height as uint, nbytes: 4, sim: simtype }
+}
+
 fn main() {
-    animate();
+    let cfg = configure("config/cfg.toml".as_slice());
+    let (particles, stepfn) = init_particles(cfg);
+    animate(particles, stepfn);
 }
