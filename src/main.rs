@@ -1,4 +1,5 @@
 extern crate sdl2;
+extern crate toml = "rust-toml";
 
 use sdl2::rect::Point;
 use sdl2::pixels::{RGB, RGBA};
@@ -31,7 +32,7 @@ fn circle_points(x: f64, y: f64, r:f64) -> Vec<Point> {
 }
 
 fn pcls2pixel(particles: &Vec<Particle>) -> Vec<u8> {
-    let mut arr : Vec<u8> = Vec::from_fn(NBYTES*WIDTH*HEIGHT, |x| 0);
+    let mut arr : Vec<u8> = Vec::from_fn(NBYTES*WIDTH*HEIGHT, |_| 0);
     let midx = (WIDTH/2) as f64;
     let midy = (HEIGHT/2) as f64;
     for p in particles.iter() {
@@ -63,18 +64,18 @@ fn animate() {
     let centre1 = Particle { pos: PhysVec {x: 0., y:0.},
                          vel: PhysVec {x: 0., y:0.},
                          mass: 100.};
-    let galaxy1 = physics::make_galaxy(physics::Random, centre1, 800., 20000);
+    let galaxy1 = physics::make_galaxy(physics::Random, centre1, 600., 10000);
     let mut particles : Vec<Particle> = Vec::new();
     particles.push_all(galaxy1.as_slice());
+
     let lenp = particles.len();
     let mut framect = 0;
-    let pixels : Vec<u8> = Vec::with_capacity(NBYTES*WIDTH*HEIGHT);
 
     renderer.clear();
     loop {
         renderer.clear();
         //physics::stepsim(&mut particles, lenp);
-        barneshut::bh_stepsim(&mut particles, lenp, 0.5);
+        barneshut::bh_stepsim(&mut particles, lenp, 1.0);
         let points = pcls2points(&particles);
         renderer.draw_points(points.as_slice());
         renderer.present();

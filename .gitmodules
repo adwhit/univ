@@ -1,3 +1,6 @@
 [submodule "lib/rust-sdl2"]
 	path = lib/rust-sdl2
 	url = http://github.com/AngryLawyer/rust-sdl2.git
+[submodule "lib/rust-toml"]
+	path = lib/rust-toml
+	url = https://github.com/mneumann/rust-toml.git
