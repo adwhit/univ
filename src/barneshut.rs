@@ -1,22 +1,13 @@
 use physics::{Particle, PhysVec, force, stepvel};
 use std::fmt;
 
-static THRESH : f64 = 1.0;
+pub static mut THRESH : f64 = 1.0;
 
 struct Branch<'a> {
     tl : Box<Node<'a>>,
     tr : Box<Node<'a>>,
     bl : Box<Node<'a>>,
     br : Box<Node<'a>>
-}
-
-impl<'a> Branch<'a> {
-    fn new() -> Branch<'a> {
-        Branch  { tl: box Zero,
-               tr: box Zero,
-               bl: box Zero,
-               br: box Zero }
-    }
 }
 
 enum Node<'a> {
@@ -34,7 +25,7 @@ struct BoxStats {
 }
 
 pub struct QuadTree<'a> {
-    pub root: Node<'a>
+    pub root: Node<'a>,
 }
 
 impl<'a> QuadTree<'a> {
@@ -144,7 +135,7 @@ pub fn bh_force(p: &Particle, node: &Node) -> Option<PhysVec> {
         One(p2) => if p == p2 { return None } else { return Some(force(p, p2)) } ,
         Zero    => return None,
         Many(stats,ref branch) => {
-            if p.pos.diff(stats.com.pos).modulus()/stats.width > THRESH {
+            if unsafe { p.pos.diff(stats.com.pos).modulus()/stats.width > THRESH } {
                 return Some(force(p, &stats.com))
             } else {
                 return Some(force_branch(p, branch))

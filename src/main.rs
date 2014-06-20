@@ -3,9 +3,7 @@ extern crate toml = "rust-toml";
 extern crate debug;
 
 use sdl2::rect::Point;
-use sdl2::pixels::{RGB, RGBA};
-use std::rand;
-use physics::{Particle, PhysVec, GalaxyCfg};
+use physics::{Particle, GalaxyCfg};
 
 mod physics;
 mod barneshut;
@@ -16,54 +14,20 @@ enum SimType {
 }
 
 struct Config {
-    width:    uint,
-    height:   uint,
-    nbytes:   uint,
+    display :  Display,
     galaxies: Vec<GalaxyCfg>,
-    sim:      SimType
+    sim:      SimType,
+    threshold:f64
 }
 
-static WIDTH: uint = 2048;
-static HEIGHT: uint = 1400;
-static NBYTES: uint = 4;
-
-fn circle_points(x: f64, y: f64, r:f64) -> Vec<Point> {
-    let mut points: Vec<Point> = Vec::new();
-    let rr = r as i32;
-    let xr = x as i32;
-    let yr = y as i32;
-    for dy in range(0,rr) {
-        let xlim = ((rr*rr - dy*dy) as f64).sqrt() as i32;
-        for dx in range (0, xlim) {
-            points.push(Point {x:xr + dx, y: yr + dy});
-            points.push(Point {x:xr - dx, y: yr + dy});
-            points.push(Point {x:xr + dx, y: yr - dy});
-            points.push(Point {x:xr - dx, y: yr - dy});
-        }
-    }
-    points
+struct Display {
+    width: uint,
+    height: uint
 }
 
-fn pcls2pixel(particles: &Vec<Particle>) -> Vec<u8> {
-    let mut arr : Vec<u8> = Vec::from_fn(NBYTES*WIDTH*HEIGHT, |_| 0);
-    let midx = (WIDTH/2) as f64;
-    let midy = (HEIGHT/2) as f64;
-    for p in particles.iter() {
-        let xind = (p.pos.x + midx) as uint;
-        let yind = (p.pos.y + midy) as uint;
-        if xind < WIDTH && yind < HEIGHT {
-            let ix = NBYTES * ((yind * WIDTH) + xind);
-            *arr.get_mut(ix) = 0xff;
-            *arr.get_mut(ix+1) = 0xff;
-            *arr.get_mut(ix+2) = 0xff;
-        }
-    }
-    arr
-}
-
-fn pcls2points(particles: &Vec<Particle>) -> Vec<Point> {
-    let midx = (WIDTH/2) as f64;
-    let midy = (HEIGHT/2) as f64;
+fn pcls2points(particles: &Vec<Particle>, display: Display) -> Vec<Point> {
+    let midx = (display.width/2) as f64;
+    let midy = (display.height/2) as f64;
     let mut arr: Vec<Point> = Vec::new();
     for p in particles.iter() {
         arr.push(Point {x: (p.pos.x + midx) as i32, y: (p.pos.y + midy) as i32 })
@@ -71,7 +35,7 @@ fn pcls2points(particles: &Vec<Particle>) -> Vec<Point> {
     arr
 }
 
-fn init_particles(cfg: Config) ->  (Vec<Particle>, fn(&mut Vec<Particle>)) {
+fn init_particles(cfg: &Config) ->  (Vec<Particle>, fn(&mut Vec<Particle>)) {
     let mut particles : Vec<Particle> = Vec::new();
     for &gal in cfg.galaxies.iter() {
         let galaxy = physics::make_galaxy(gal);
@@ -83,15 +47,14 @@ fn init_particles(cfg: Config) ->  (Vec<Particle>, fn(&mut Vec<Particle>)) {
     }
 }
 
-fn animate(mut particles: Vec<Particle>, stepfn: fn(&mut Vec<Particle>) ) {
-    let lenp = particles.len();
-    let renderer = get_renderer();
+fn animate(mut particles: Vec<Particle>, stepfn: fn(&mut Vec<Particle>), display: Display ) {
+    let renderer = get_renderer(display);
     let mut framect = 0;
     renderer.clear();
     loop {
         renderer.clear();
         stepfn(&mut particles);
-        let points = pcls2points(&particles);
+        let points = pcls2points(&particles, display);
         renderer.draw_points(points.as_slice());
         renderer.present();
         framect += 1;
@@ -108,8 +71,8 @@ fn animate(mut particles: Vec<Particle>, stepfn: fn(&mut Vec<Particle>) ) {
     sdl2::quit();
 }
 
-fn get_renderer() -> sdl2::render::Renderer<sdl2::video::Window> {
-    sdl2::render::Renderer::new_with_window(WIDTH as int, HEIGHT as int, sdl2::video::FullscreenDesktop).unwrap()
+fn get_renderer(display: Display) -> sdl2::render::Renderer<sdl2::video::Window> {
+    sdl2::render::Renderer::new_with_window(display.width as int, display.height as int, sdl2::video::FullscreenDesktop).unwrap()
 }
 
 fn config_helper_int(root: &toml::Value, lookup: &str, default: i64) -> i64 {
@@ -128,8 +91,9 @@ fn config_helper_float(root: &toml::Value, lookup: &str, default: f64) -> f64 {
 
 fn configure(path: &str) -> Config {
     let root = toml::parse_from_file(path).unwrap();
-    let width = config_helper_int( &root, "global.screenwidth",  2048);
-    let height = config_helper_int(&root, "global.screenheight", 1024);
+    let width = config_helper_int( &root, "display.screenwidth",  2048);
+    let height = config_helper_int(&root, "display.screenheight", 1024);
+    let threshold = config_helper_float(&root, "physics.threshold", 1.0);
     let simtype = match root.lookup("physics.simtype") {
         Some(v) => { 
             let sim = v.get_str().unwrap();
@@ -140,22 +104,31 @@ fn configure(path: &str) -> Config {
         None    => BarnesHut
     };
     Config { 
-        width: width as uint, 
-        height: height as uint, 
-        nbytes: 4, 
+        display:  Display { width: width as uint, height: height as uint }, 
         galaxies: galaxy_configure(&root),
-        sim: simtype }
+        sim:      simtype,
+        threshold:threshold
+    }
 }
 
 fn galaxy_configure(root: &toml::Value) -> Vec<GalaxyCfg> {
     let mut galaxies : Vec<GalaxyCfg> = Vec::new();
     let mut gal_ix = 0;
     loop {
+        //nstars is only mandatory configuration argument
+        let nstars = match root.lookup(format!("galaxy.{:d}.nstars", gal_ix).as_slice()) {
+            Some(v) => v.get_int().unwrap() as uint,
+            None    => break
+        };
+        // Galaxy shape and kinetics needs to be done separately and treat special options
         let shape = match root.lookup(format!("galaxy.{:d}.shape", gal_ix).as_slice()) {
             Some(v) => { 
                 let shapestr = v.get_str().unwrap();
                 if shapestr.equiv(&"random") { physics::RandomRadius }
-                else if shapestr.equiv(&"Concentric") { physics::Concentric(10) }
+                else if shapestr.equiv(&"concentric") { 
+                    let nrings = config_helper_int(root, format!("galaxy.{:d}.nrings", gal_ix).as_slice(), 5) as uint;
+                    physics::Concentric(nrings) 
+                }
                 else { fail!("Error - {} not recognized", shapestr) }
             },
             None    => physics::RandomRadius
@@ -164,7 +137,11 @@ fn galaxy_configure(root: &toml::Value) -> Vec<GalaxyCfg> {
             Some(v) => { 
                 let kinstr = v.get_str().unwrap();
                 if kinstr.equiv(&"zero") { physics::ZeroVel }
-                else if kinstr.equiv(&"random") { physics::RandomVel(0.0, 1.0) }
+                else if kinstr.equiv(&"random") { 
+                    let minv = config_helper_float(root, format!("galaxy.{:d}.minv", gal_ix).as_slice(), 0.0);
+                    let maxv = config_helper_float(root, format!("galaxy.{:d}.maxv", gal_ix).as_slice(), 10.0);
+                    physics::RandomVel(minv, maxv) 
+                }
                 else if kinstr.equiv(&"circular") { physics::CircularOrbit }
                 else { fail!("Error - {} not recognized", kinstr) }
             },
@@ -176,20 +153,19 @@ fn galaxy_configure(root: &toml::Value) -> Vec<GalaxyCfg> {
                 velx : config_helper_float(root, format!("galaxy.{:d}.velx", gal_ix).as_slice(), 0.0),
                 vely : config_helper_float(root, format!("galaxy.{:d}.vely", gal_ix).as_slice(), 0.0),
                 radius : config_helper_float(root, format!("galaxy.{:d}.radius", gal_ix).as_slice(), 300.0),
-                nstars : config_helper_int(root, format!("galaxy.{:d}.nstars", gal_ix).as_slice(), 500) as uint,
-                central_mass : config_helper_float(root, format!("galaxy.{:d}.central_mass", gal_ix).as_slice(), 1000.0),
-                other_mass : config_helper_float(root, format!("galaxy.{:d}.other_mass", gal_ix).as_slice(), 1.0),
+                nstars : nstars,
+                central_mass : config_helper_float(root, format!("galaxy.{:d}.centralmass", gal_ix).as_slice(), 1000.0),
+                other_mass : config_helper_float(root, format!("galaxy.{:d}.othermass", gal_ix).as_slice(), 1.0),
                 shape: shape,
                 kinetics: kinetics });
         gal_ix += 1;
-        break;
     }
     galaxies
 }
 
 fn main() {
     let cfg = configure("config/cfg.toml".as_slice());
-    //println!("{:?}", cfg);
-    let (particles, stepfn) = init_particles(cfg);
-    animate(particles, stepfn);
+    unsafe {barneshut::THRESH = cfg.threshold};
+    let (particles, stepfn) = init_particles(&cfg);
+    animate(particles, stepfn, cfg.display);
 }

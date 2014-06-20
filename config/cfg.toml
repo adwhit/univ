@@ -1,21 +1,40 @@
-[global]
+[display]
 
-screenwidth = 2048
-screenheight = 1024
+screenwidth = 2560
+screenheight = 1440
 
 [physics]
 
 simtype = "barnes-hut"      # simtypes: classical or barnes-hut
-threshold = 1.0
+threshold = 1.5
 
 [[galaxy]]
-posx = 0.0
+posx = 300.0
 posy = 0.0
 velx = 0.0
 vely = 0.0
-radius = 700.0
-nstars = 5000
+radius = 400.0
+nstars = 1000
 shape = "random"             #random or concentric
+nrings = 20
 kinetics = "circular"             #zero, random, circular
-centralmass = 500.0
+minv = 0.0
+maxv = 10.0
+centralmass = 100.0
 othermass = 1.0
+
+[[galaxy]]
+posx = -300.0
+posy = 0.0
+velx = 0.0
+vely = 0.0
+radius = 400.0
+nstars = 1000
+shape = "random"             #random or concentric
+nrings = 20
+kinetics = "circular"             #zero, random, circular
+minv = 0.0
+maxv = 10.0
+centralmass = 100.0
+othermass = 1.0
+
