@@ -5,9 +5,9 @@ screenheight = 1440
 
 [physics]
 
-simtype = "barnes-hut"      # simtypes: classical or barnes-hut
+simtype = "barnes-hut" #-parallel"      # simtypes: classical, barnes-hut, barnes-hut-parallel
 threshold = 1.0
-dt = 0.1
+dt = 0.05
 
 [[galaxy]]
 posx = 0.0

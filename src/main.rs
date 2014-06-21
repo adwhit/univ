@@ -10,6 +10,7 @@ mod barneshut;
 
 enum SimType {
     BarnesHut,
+    BarnesHutParallel,
     Classical
 }
 
@@ -45,6 +46,7 @@ fn init_particles(cfg: &Config) ->  (Vec<Particle>, fn(&mut Vec<Particle>)) {
     };
     match cfg.sim {
         BarnesHut => return (particles, barneshut::stepsim),
+        BarnesHutParallel => return (particles, barneshut::stepsim_par),
         Classical => return (particles, physics::stepsim),
     }
 }
@@ -103,6 +105,7 @@ fn configure(path: &str) -> Config {
             let sim = v.get_str().unwrap();
             if sim.equiv(&"barnes-hut") { BarnesHut }
             else if sim.equiv(&"classical") { Classical }
+            else if sim.equiv(&"barnes-hut-parallel") { BarnesHutParallel }
             else { fail!("Error - {} not recognized", sim) }
         },
         None    => BarnesHut

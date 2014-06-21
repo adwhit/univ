@@ -1,5 +1,6 @@
 use physics::{Particle, PhysVec, force, stepvel};
 use std::fmt;
+use std::sync::{Future,Arc};
 
 pub static mut THRESH : f64 = 1.0;
 
@@ -12,7 +13,7 @@ struct Branch<'a> {
 
 enum Node<'a> {
     Many(BoxStats, Branch<'a>),
-    One(&'a Particle),
+    One(Particle),
     Zero
 }
 
@@ -29,7 +30,7 @@ pub struct QuadTree<'a> {
 }
 
 impl<'a> QuadTree<'a> {
-    pub fn new<'a> (particles: Vec<&'a Particle>) -> QuadTree<'a> {
+    pub fn new<'a> (particles: Vec<Particle>) -> QuadTree<'a> {
         let (xmax, xmin, ymax, ymin) = find_bounding_box(&particles);
         let x = xmax + xmin / 2.0;
         let y = ymax + ymin / 2.0;
@@ -44,12 +45,12 @@ impl<'a> QuadTree<'a> {
         QuadTree { root: make_node(particles, x, y, xvar, yvar) }
     }
 
-    pub fn force(&self, p: &Particle) -> PhysVec {
-        bh_force(p, &self.root).unwrap()
+    pub fn force(&self, p: Particle) -> PhysVec {
+        bh_force(&p, &self.root).unwrap()
     }
 }
 
-pub fn find_bounding_box(particles: &Vec<&Particle>) -> (f64, f64, f64, f64) {
+pub fn find_bounding_box(particles: &Vec<Particle>) -> (f64, f64, f64, f64) {
     let mut xmax = Float::neg_infinity(); let mut ymax = Float::neg_infinity();
     let mut xmin = Float::infinity();     let mut ymin = Float::infinity();
     for p in particles.iter() {
@@ -61,8 +62,8 @@ pub fn find_bounding_box(particles: &Vec<&Particle>) -> (f64, f64, f64, f64) {
     (xmax, xmin, ymax, ymin)
 }
 
-fn make_branch<'a>(particles: Vec<&'a Particle>, x: f64, y: f64, xvar: f64, yvar: f64) -> Branch<'a> {
-    let (tla, tra, bla, bra) = partition(particles, x, y);
+fn make_branch<'a>(particles: Vec<Particle>, x: f64, y: f64, xvar: f64, yvar: f64) -> Branch<'a> {
+    let (tla, tra, bla, bra) = partition(&particles, x, y);
     Branch { 
            tl: box make_node(tla, x-xvar/2., y+yvar/2., xvar/2., yvar/2.),
            tr: box make_node(tra, x+xvar/2., y+yvar/2., xvar/2., yvar/2.),
@@ -71,24 +72,24 @@ fn make_branch<'a>(particles: Vec<&'a Particle>, x: f64, y: f64, xvar: f64, yvar
     }
 }
 
-fn make_node<'a>(particles: Vec<&'a Particle>, x: f64, y: f64, xvar: f64, yvar: f64) -> Node<'a> {
+fn make_node<'a>(particles: Vec<Particle>, x: f64, y: f64, xvar: f64, yvar: f64) -> Node<'a> {
     let n = particles.len();
     if n > 1 { 
         let stats = calc_stats(&particles, x, y, xvar, yvar);
         return Many(stats, make_branch(particles, x, y, xvar, yvar));
     } else if n == 1 {
-        return One(*particles.get(0));
+        return One(particles.get(0).clone());
     } else {
         return Zero;
     }
 }
 
-fn partition<'a>(particles: Vec<&'a Particle>, xsplit: f64, ysplit: f64) ->
-    (Vec<&'a Particle>, Vec<&'a Particle>, Vec<&'a Particle>, Vec<&'a Particle>) {
-    let mut tr: Vec<&Particle> = Vec::new();
-    let mut br: Vec<&Particle> = Vec::new();
-    let mut tl: Vec<&Particle> = Vec::new();
-    let mut bl: Vec<&Particle> = Vec::new();
+fn partition<'a>(particles: &Vec<Particle>, xsplit: f64, ysplit: f64) ->
+    (Vec<Particle>, Vec<Particle>, Vec<Particle>, Vec<Particle>) {
+    let mut tr: Vec<Particle> = Vec::new();
+    let mut br: Vec<Particle> = Vec::new();
+    let mut tl: Vec<Particle> = Vec::new();
+    let mut bl: Vec<Particle> = Vec::new();
     for &p in particles.iter() {
         if p.pos.x > xsplit {
             if p.pos.y > ysplit {
@@ -107,7 +108,7 @@ fn partition<'a>(particles: Vec<&'a Particle>, xsplit: f64, ysplit: f64) ->
     (tl, tr, bl, br)
 }
 
-fn calc_stats(particles: &Vec<&Particle>, x: f64, y:f64, xvar:f64, yvar:f64) -> BoxStats {
+fn calc_stats(particles: &Vec<Particle>, x: f64, y:f64, xvar:f64, yvar:f64) -> BoxStats {
     let mut xmass_sum = 0.;
     let mut ymass_sum = 0.;
     let mut mass = 0.;
@@ -132,7 +133,7 @@ fn calc_stats(particles: &Vec<&Particle>, x: f64, y:f64, xvar:f64, yvar:f64) -> 
 
 pub fn bh_force(p: &Particle, node: &Node) -> Option<PhysVec> {
     match *node {
-        One(p2) => if p == p2 { return None } else { return Some(force(p, p2)) } ,
+        One(p2) => if *p == p2 { return None } else { return Some(force(p, &p2)) } ,
         Zero    => return None,
         Many(stats,ref branch) => {
             if unsafe { p.pos.diff(stats.com.pos).modulus()/stats.width > THRESH } {
@@ -177,14 +178,29 @@ pub fn pcl_pointers<'a>(particles: &'a Vec<Particle>) -> Vec<&'a Particle> {
 pub fn stepsim(particles: &mut Vec<Particle>) {
     let mut frcs : Vec<PhysVec> =  Vec::with_capacity(particles.len());
     {
-        let pcl_ptrs = pcl_pointers(particles);
-        let qt = QuadTree::new(pcl_ptrs);
-        for p in particles.iter() {
+        let qt = QuadTree::new(particles.clone());
+        for &p in particles.iter() {
             frcs.push(qt.force(p));
         }
     }
     for (p, &f) in particles.mut_iter().zip(frcs.iter()) {
         stepvel(p, f, true);
+        p.steppos();
+    }
+}
+
+pub fn stepsim_par(particles: &mut Vec<Particle>) {
+    let lenp = particles.len();
+    let mut force_future : Vec<Future<PhysVec>> =  Vec::with_capacity(lenp);
+    {
+        let rcqt = Arc::new(QuadTree::new(particles.clone()));
+        for &p in particles.iter() {
+            let localqt = rcqt.clone();
+            force_future.push(Future::spawn( proc() { localqt.force(p) } ) );
+        }
+    }
+    for (p, ft) in particles.mut_iter().zip(force_future.mut_iter()) {
+        stepvel(p, ft.get(), true);
         p.steppos();
     }
 }
