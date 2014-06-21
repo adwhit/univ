@@ -1,18 +1,18 @@
 use physics::{Particle, PhysVec, force, stepvel};
 use std::fmt;
-use std::sync::{Future,Arc};
+use std::sync::{Arc,deque};
 
 pub static mut THRESH : f64 = 1.0;
 
-struct Branch<'a> {
-    tl : Box<Node<'a>>,
-    tr : Box<Node<'a>>,
-    bl : Box<Node<'a>>,
-    br : Box<Node<'a>>
+struct Branch {
+    tl : Box<Node>,
+    tr : Box<Node>,
+    bl : Box<Node>,
+    br : Box<Node>
 }
 
-enum Node<'a> {
-    Many(BoxStats, Branch<'a>),
+enum Node {
+    Many(BoxStats, Branch),
     One(Particle),
     Zero
 }
@@ -25,12 +25,12 @@ struct BoxStats {
     num_particles: uint
 }
 
-pub struct QuadTree<'a> {
-    pub root: Node<'a>,
+pub struct QuadTree {
+    pub root: Node,
 }
 
-impl<'a> QuadTree<'a> {
-    pub fn new<'a> (particles: Vec<Particle>) -> QuadTree<'a> {
+impl QuadTree {
+    pub fn new (particles: Vec<Particle>) -> QuadTree {
         let (xmax, xmin, ymax, ymin) = find_bounding_box(&particles);
         let x = xmax + xmin / 2.0;
         let y = ymax + ymin / 2.0;
@@ -62,7 +62,7 @@ pub fn find_bounding_box(particles: &Vec<Particle>) -> (f64, f64, f64, f64) {
     (xmax, xmin, ymax, ymin)
 }
 
-fn make_branch<'a>(particles: Vec<Particle>, x: f64, y: f64, xvar: f64, yvar: f64) -> Branch<'a> {
+fn make_branch(particles: Vec<Particle>, x: f64, y: f64, xvar: f64, yvar: f64) -> Branch {
     let (tla, tra, bla, bra) = partition(&particles, x, y);
     Branch { 
            tl: box make_node(tla, x-xvar/2., y+yvar/2., xvar/2., yvar/2.),
@@ -72,7 +72,7 @@ fn make_branch<'a>(particles: Vec<Particle>, x: f64, y: f64, xvar: f64, yvar: f6
     }
 }
 
-fn make_node<'a>(particles: Vec<Particle>, x: f64, y: f64, xvar: f64, yvar: f64) -> Node<'a> {
+fn make_node(particles: Vec<Particle>, x: f64, y: f64, xvar: f64, yvar: f64) -> Node {
     let n = particles.len();
     if n > 1 { 
         let stats = calc_stats(&particles, x, y, xvar, yvar);
@@ -191,17 +191,39 @@ pub fn stepsim(particles: &mut Vec<Particle>) {
 
 pub fn stepsim_par(particles: &mut Vec<Particle>) {
     let lenp = particles.len();
-    let mut force_future : Vec<Future<PhysVec>> =  Vec::with_capacity(lenp);
-    {
-        let rcqt = Arc::new(QuadTree::new(particles.clone()));
-        for &p in particles.iter() {
-            let localqt = rcqt.clone();
-            force_future.push(Future::spawn( proc() { localqt.force(p) } ) );
-        }
+    let rcqt = Arc::new(QuadTree::new(particles.clone()));
+
+    let (tx, rx) = channel();              //channel to receive results
+    let pool = deque::BufferPool::new();   //work pool
+    let (worker, stealer) = pool.deque();
+
+    for (ix, &p) in particles.iter().enumerate() {
+        worker.push((ix, p.clone()))             //construct queue
     }
-    for (p, ft) in particles.mut_iter().zip(force_future.mut_iter()) {
-        stepvel(p, ft.get(), true);
+
+    for ix in range(0,5) {
+        let localqt = rcqt.clone();
+        let localtx = tx.clone();
+        let stlr = stealer.clone();
+        spawn(proc() {
+            steal_work(localqt, &localtx, stlr)
+        });
+    }
+    for _ in range(0, lenp) {
+        let (ix, pv) = rx.recv();
+        let p = particles.get_mut(ix);
+        stepvel(p, pv, true);
         p.steppos();
+    }
+}
+
+fn steal_work(qt: Arc<QuadTree>, tx: &Sender<(uint, PhysVec)>, stealer: deque::Stealer<(uint, Particle)>) {
+    loop {
+        match stealer.steal() {
+            deque::Empty => break,
+            deque::Abort => continue,
+            deque::Data((ix,p)) => tx.send((ix,qt.force(p)))
+        }
     }
 }
 
