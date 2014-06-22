@@ -1,5 +1,6 @@
 extern crate sdl2;
 extern crate time;
+extern crate getopts;
 extern crate toml = "rust-toml";
 
 use sdl2::rect::Point;
@@ -82,19 +83,7 @@ fn get_renderer(display: Display) -> sdl2::render::Renderer<sdl2::video::Window>
     sdl2::render::Renderer::new_with_window(display.width as int, display.height as int, sdl2::video::FullscreenDesktop).unwrap()
 }
 
-fn config_helper_int(root: &toml::Value, lookup: &str, default: i64) -> i64 {
-    match root.lookup(lookup) {
-        Some(v) => v.get_int().unwrap(),
-        None    => default
-    }
-}
-
-fn config_helper_float(root: &toml::Value, lookup: &str, default: f64) -> f64 {
-    match root.lookup(lookup) {
-        Some(v) => v.get_float().unwrap(),
-        None    => default
-    }
-}
+// ******* Configuration ******* //
 
 fn configure(path: &str) -> Config {
     let root = toml::parse_from_file(path).unwrap();
@@ -119,6 +108,53 @@ fn configure(path: &str) -> Config {
     }
 }
 
+fn config_helper_int(root: &toml::Value, lookup: &str, default: i64) -> i64 {
+    match root.lookup(lookup) {
+        Some(v) => v.get_int().unwrap(),
+        None    => default
+    }
+}
+
+fn config_helper_float(root: &toml::Value, lookup: &str, default: f64) -> f64 {
+    match root.lookup(lookup) {
+        Some(v) => v.get_float().unwrap(),
+        None    => default
+    }
+}
+
+fn shape_configure(root: &toml::Value, gal_ix: int) -> physics::GalaxyShape {
+    match root.lookup(format!("galaxy.{:d}.shape", gal_ix).as_slice()) {
+        Some(v) => { 
+            let shapestr = v.get_str().unwrap();
+            if shapestr.equiv(&"random-weighted") { physics::RandomWeighted }
+            else if shapestr.equiv(&"random-even") { physics::RandomEven }
+            else if shapestr.equiv(&"concentric") { 
+                let nrings = config_helper_int(root, format!("galaxy.{:d}.nrings", gal_ix).as_slice(), 5) as uint;
+                physics::Concentric(nrings) 
+            }
+            else { fail!("Error - {} not recognized", shapestr) }
+        },
+        None    => physics::RandomWeighted
+    }
+}
+
+fn kinetics_configure(root: &toml::Value, gal_ix: int) -> physics::GalaxyKinetics {
+    match root.lookup(format!("galaxy.{:d}.kinetics", gal_ix).as_slice()) {
+        Some(v) => { 
+            let kinstr = v.get_str().unwrap();
+            if kinstr.equiv(&"zero") { physics::ZeroVel }
+            else if kinstr.equiv(&"random") { 
+                let minv = config_helper_float(root, format!("galaxy.{:d}.minv", gal_ix).as_slice(), 0.0);
+                let maxv = config_helper_float(root, format!("galaxy.{:d}.maxv", gal_ix).as_slice(), 10.0);
+                physics::RandomVel(minv, maxv) 
+            }
+            else if kinstr.equiv(&"circular") { physics::CircularOrbit }
+            else { fail!("Error - {} not recognized", kinstr) }
+        },
+        None    => physics::CircularOrbit
+    }
+}
+
 fn galaxy_configure(root: &toml::Value) -> Vec<GalaxyCfg> {
     let mut galaxies : Vec<GalaxyCfg> = Vec::new();
     let mut gal_ix = 0;
@@ -127,33 +163,6 @@ fn galaxy_configure(root: &toml::Value) -> Vec<GalaxyCfg> {
         let nbody = match root.lookup(format!("galaxy.{:d}.nbody", gal_ix).as_slice()) {
             Some(v) => v.get_int().unwrap() as uint,
             None    => break
-        };
-        // Galaxy shape and kinetics needs to be done separately and treat special options
-        let shape = match root.lookup(format!("galaxy.{:d}.shape", gal_ix).as_slice()) {
-            Some(v) => { 
-                let shapestr = v.get_str().unwrap();
-                if shapestr.equiv(&"random") { physics::RandomRadius }
-                else if shapestr.equiv(&"concentric") { 
-                    let nrings = config_helper_int(root, format!("galaxy.{:d}.nrings", gal_ix).as_slice(), 5) as uint;
-                    physics::Concentric(nrings) 
-                }
-                else { fail!("Error - {} not recognized", shapestr) }
-            },
-            None    => physics::RandomRadius
-        };
-        let kinetics = match root.lookup(format!("galaxy.{:d}.kinetics", gal_ix).as_slice()) {
-            Some(v) => { 
-                let kinstr = v.get_str().unwrap();
-                if kinstr.equiv(&"zero") { physics::ZeroVel }
-                else if kinstr.equiv(&"random") { 
-                    let minv = config_helper_float(root, format!("galaxy.{:d}.minv", gal_ix).as_slice(), 0.0);
-                    let maxv = config_helper_float(root, format!("galaxy.{:d}.maxv", gal_ix).as_slice(), 10.0);
-                    physics::RandomVel(minv, maxv) 
-                }
-                else if kinstr.equiv(&"circular") { physics::CircularOrbit }
-                else { fail!("Error - {} not recognized", kinstr) }
-            },
-            None    => physics::CircularOrbit
         };
         galaxies.push( GalaxyCfg {
                 posx : config_helper_float(root, format!("galaxy.{:d}.posx", gal_ix).as_slice(), 0.0),
@@ -164,15 +173,31 @@ fn galaxy_configure(root: &toml::Value) -> Vec<GalaxyCfg> {
                 nbody : nbody,
                 central_mass : config_helper_float(root, format!("galaxy.{:d}.centralmass", gal_ix).as_slice(), 1000.0),
                 other_mass : config_helper_float(root, format!("galaxy.{:d}.othermass", gal_ix).as_slice(), 1.0),
-                shape: shape,
-                kinetics: kinetics });
+                shape: shape_configure(root, gal_ix),
+                kinetics: kinetics_configure(root, gal_ix) });
         gal_ix += 1;
     }
     galaxies
 }
 
+fn opts() -> String {
+    let args: Vec<String> = std::os::args().iter().map(|x| x.to_string()).collect(); 
+    let opts = [
+        getopts::optopt("c", "config", "Configuration file", "PATH")
+        ];
+    let matches = match getopts::getopts(args.tail(), opts) {
+        Ok(m) => m,
+        Err(f) => fail!(f.to_str())
+    };
+    match matches.opt_str("c") {
+        Some(c) => return c,
+        None    => return String::from_str("config/default.toml")
+    }
+}
+
 fn main() {
-    let cfg = configure("config/cfg.toml".as_slice());
+    let pathstr = opts();
+    let cfg = configure(pathstr.as_slice());
     unsafe {barneshut::THRESH = cfg.threshold};
     unsafe {physics::DT = cfg.dt};
     let (particles, stepfn) = init_particles(&cfg);

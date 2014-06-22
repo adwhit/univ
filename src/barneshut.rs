@@ -201,7 +201,7 @@ pub fn stepsim_par(particles: &mut Vec<Particle>) {
         worker.push((ix, p.clone()))             //construct queue
     }
 
-    for ix in range(0,5) {
+    for _ in range(0,7) {
         let localqt = rcqt.clone();
         let localtx = tx.clone();
         let stlr = stealer.clone();

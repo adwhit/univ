@@ -21,7 +21,8 @@ pub struct PhysVec {
 
 //Represents internal shape of galaxy
 pub enum GalaxyShape {
-    RandomRadius,
+    RandomWeighted,
+    RandomEven,
     Concentric(uint)
 }
 
@@ -121,7 +122,7 @@ fn spawn_circular_galaxy(max_radius: f64, nrings: uint, num_bodys: uint) -> Vec<
     particles
 }
 
-fn spawn_random_galaxy(radius: f64, num_bodys: uint) -> Vec<Particle> {
+fn spawn_random_galaxy_weighted(radius: f64, num_bodys: uint) -> Vec<Particle> {
     let pi =  f64::consts::PI;
     let mut particles: Vec<Particle> = Vec::new();
     for _ in range(0,num_bodys) {
@@ -132,6 +133,23 @@ fn spawn_random_galaxy(radius: f64, num_bodys: uint) -> Vec<Particle> {
         particles.push(Particle {pos:PhysVec {x: x,  y: y },
                                  vel:PhysVec {x: 0., y: 0.},
                                  mass:1. });
+    }
+    particles
+}
+
+fn spawn_random_galaxy_even(radius: f64, num_bodys: uint) -> Vec<Particle> {
+    let mut particles: Vec<Particle> = Vec::new();
+    let r2 = radius * radius;
+    let mut ct = 0;
+    while ct < num_bodys {
+        let x = (rand::random::<f64>() - 0.5)*2.0*radius;
+        let y = (rand::random::<f64>() - 0.5)*2.0*radius;
+        if x*x + y*y < r2 {
+            particles.push(Particle {pos:PhysVec {x: x,  y: y },
+                                     vel:PhysVec {x: 0., y: 0.},
+                                     mass:1. });
+        }
+        ct +=1;
     }
     particles
 }
@@ -151,7 +169,8 @@ pub fn make_galaxy(gal: GalaxyCfg) -> Vec<Particle> {
         mass: gal.central_mass
     };
     let mut particles = match gal.shape {
-        RandomRadius => spawn_random_galaxy(gal.radius, gal.nbody),
+        RandomWeighted => spawn_random_galaxy_weighted(gal.radius, gal.nbody),
+        RandomEven => spawn_random_galaxy_even(gal.radius, gal.nbody),
         Concentric(nrings) => spawn_circular_galaxy(gal.radius, nrings, gal.nbody)
     };
 
