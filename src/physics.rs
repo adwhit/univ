@@ -1,5 +1,7 @@
 use std::{f64, iter, rand, fmt};
 use std::iter::AdditiveIterator;
+use config::{GalaxyCfg, GalaxyShape};
+use config;
 
 pub static mut DT: f64 = 0.05;
 static EPS: f64 = 0.;
@@ -17,32 +19,6 @@ pub struct Particle {
 pub struct PhysVec {
     pub x : f64,
     pub y : f64
-}
-
-//Represents internal shape of galaxy
-pub enum GalaxyShape {
-    RandomWeighted,
-    RandomEven,
-    Concentric(uint)
-}
-
-pub enum GalaxyKinetics {
-    RandomVel(f64, f64),
-    CircularOrbit,
-    ZeroVel,
-}
-
-pub struct GalaxyCfg {
-    pub posx: f64,
-    pub posy: f64,
-    pub velx: f64,
-    pub vely: f64,
-    pub radius: f64,
-    pub nbody: uint,
-    pub shape: GalaxyShape,
-    pub kinetics: GalaxyKinetics,
-    pub central_mass: f64,
-    pub other_mass: f64
 }
 
 impl PhysVec {
@@ -164,20 +140,20 @@ fn galilean_offset(particles: &mut Vec<Particle>, central_pcl: &Particle) {
 
 pub fn make_galaxy(gal: GalaxyCfg) -> Vec<Particle> {
     let central_pcl = Particle { 
-        pos: PhysVec { x: gal.posx, y: gal.posy },
-        vel: PhysVec { x: gal.velx, y: gal.vely },
-        mass: gal.central_mass
+        pos: PhysVec { x: gal.posx.unwrap(), y: gal.posy.unwrap() },
+        vel: PhysVec { x: gal.velx.unwrap(), y: gal.vely.unwrap() },
+        mass: gal.central_mass.unwrap()
     };
-    let mut particles = match gal.shape {
-        RandomWeighted => spawn_random_galaxy_weighted(gal.radius, gal.nbody),
-        RandomEven => spawn_random_galaxy_even(gal.radius, gal.nbody),
-        Concentric(nrings) => spawn_circular_galaxy(gal.radius, nrings, gal.nbody)
+    let mut particles = match gal.shape.unwrap() {
+        config::RandomWeighted => spawn_random_galaxy_weighted(gal.radius.unwrap(), gal.nbody),
+        config::RandomEven => spawn_random_galaxy_even(gal.radius.unwrap(), gal.nbody),
+        config::Concentric(nrings) => spawn_circular_galaxy(gal.radius.unwrap(), nrings, gal.nbody)
     };
 
-    match gal.kinetics {
-        ZeroVel               => (),
-        RandomVel(minv, maxv) => init_random_vel(&mut particles, minv, maxv),
-        CircularOrbit         => init_circular_orbits(&mut particles, central_pcl.mass)
+    match gal.kinetics.unwrap() {
+        config::ZeroVel               => (),
+        config::RandomVel(minv, maxv) => init_random_vel(&mut particles, minv, maxv),
+        config::CircularOrbit         => init_circular_orbits(&mut particles, central_pcl.mass)
     };
     galilean_offset(&mut particles, &central_pcl);
     particles.push(central_pcl);

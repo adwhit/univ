@@ -1,0 +1,18 @@
+[package]
+
+name = "univ"
+version = "0.1.0"
+authors = ["alex.whitney@cantab.net"]
+
+[[bin]]
+
+name = "univ"
+
+[dependencies.sdl2]
+
+#git = "https://github.com/AngryLawyer/rust-sdl2.git"
+git = "https://github.com/gmorenz/rust-sdl2.git"
+
+[dependencies.toml]
+
+git = "https://github.com/alexcrichton/toml-rs.git"
