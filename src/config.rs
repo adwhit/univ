@@ -1,11 +1,11 @@
-#[deriving(Decodable, Show)]
+#[derive(RustcDecodable, Debug)]
 pub enum SimType {
     BarnesHut,
     BarnesHutParallel,
     Classical
 }
 
-#[deriving(Decodable, Show)]
+#[derive(RustcDecodable, Debug)]
 pub struct Config {
     pub display :  Display,
     pub galaxies:  Vec<GalaxyCfg>,
@@ -14,35 +14,35 @@ pub struct Config {
     pub dt       : f64
 }
 
-#[deriving(Decodable, Show)]
+#[derive(RustcDecodable, Debug)]
 pub struct ConfigOpt {
     pub display :  Option<DisplayOpt>,
-    pub galaxies:  Vec<GalaxyCfg>,
+    pub galaxies  :  Vec<GalaxyCfg>,
     pub sim:       Option<SimType>,
     pub threshold: Option<f64>,
     pub dt       : Option<f64>
 }
 
-#[deriving(Decodable, Show)]
+#[derive(RustcDecodable, Debug, Clone, Copy)]
 pub struct Display {
-    pub width: uint,
-    pub height: uint
+    pub width: i32,
+    pub height: i32
 }
 
-#[deriving(Decodable, Show)]
+#[derive(RustcDecodable, Debug)]
 pub struct DisplayOpt {
-    pub width: Option<uint>,
-    pub height: Option<uint>
+    pub width: Option<u32>,
+    pub height: Option<u32>
 }
 
-#[deriving(Decodable, Show)]
+#[derive(RustcDecodable, Debug, Clone)]
 pub struct GalaxyCfg {
     pub posx: Option<f64>,
     pub posy: Option<f64>,
     pub velx: Option<f64>,
     pub vely: Option<f64>,
     pub radius: Option<f64>,
-    pub nbody: uint,                        // the only mandatory field
+    pub nbody: u32,                        // the only mandatory field
     pub shape: Option<GalaxyShape>,
     pub kinetics: Option<GalaxyKinetics>,
     pub central_mass: Option<f64>,
@@ -50,14 +50,14 @@ pub struct GalaxyCfg {
 }
 
 //Represents internal shape of galaxy
-#[deriving(Decodable, Show)]
+#[derive(RustcDecodable, Debug, Clone, Copy)]
 pub enum GalaxyShape {
     RandomWeighted,
     RandomEven,
-    Concentric(uint)
+    Concentric(u32)
 }
 
-#[deriving(Decodable, Show)]
+#[derive(RustcDecodable, Debug, Clone, Copy)]
 pub enum GalaxyKinetics {
     RandomVel(f64, f64),
     CircularOrbit,

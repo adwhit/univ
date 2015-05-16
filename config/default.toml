@@ -1,15 +1,17 @@
-[display]
+sim = "barnes-hut-parallel"      # simtypes: classical, barnes-hut, barnes-hut-parallel
+threshold = 1.0
+dt = 0.05
 
-screenwidth = 2560
-screenheight = 1440
+[display]
+width = 2560
+height = 1440
 
 [physics]
-
 simtype = "barnes-hut-parallel"      # simtypes: classical, barnes-hut, barnes-hut-parallel
 threshold = 1.0
 dt = 0.05
 
-[[galaxy]]
+[[galaxies]]
 posx = 0.0
 posy = 0.0
 velx = 0.0
@@ -17,6 +19,6 @@ vely = 0.0
 radius = 500.0
 nbody = 5000
 shape = "random-even"             #random-even, random-weighted or concentric
-kinetics = "circular"             #zero, random, circular
-centralmass = 1000.0
-othermass = 1.0
+kinetics = "circular-orbit"             #zero, random, circular
+central_mass = 1000.0
+other_mass = 1.0

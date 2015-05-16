@@ -1,13 +1,19 @@
-extern crate serialize;
+#![feature(core, collections)]
+
+extern crate rustc_serialize;
 extern crate sdl2;
 extern crate time;
 extern crate getopts;
 extern crate toml;
+extern crate rand;
+extern crate deque;
 
 use sdl2::rect::Point;
 use physics::Particle;
 use config::{Display, Config, ConfigOpt};
-use std::io::File;
+use std::fs::File;
+use std::io::Read;
+use std::path::Path;
 
 mod physics;
 mod barneshut;
@@ -26,69 +32,74 @@ fn pcls2points(particles: &Vec<Particle>, display: Display) -> Vec<Point> {
 
 fn init_particles(cfg: &Config) ->  (Vec<Particle>, fn(&mut Vec<Particle>)) {
     let mut particles : Vec<Particle> = Vec::new();
-    for &gal in cfg.galaxies.iter() {
-        let galaxy = physics::make_galaxy(gal);
-        particles.push_all(galaxy.as_slice());
+    for gal in &cfg.galaxies {
+        let galaxy = physics::make_galaxy(gal.clone());
+        particles.push_all(&galaxy);
     };
     match cfg.sim {
-        config::BarnesHut => return (particles, barneshut::stepsim),
-        config::BarnesHutParallel => return (particles, barneshut::stepsim_par),
-        config::Classical => return (particles, physics::stepsim),
+        config::SimType::BarnesHut => return (particles, barneshut::stepsim),
+        config::SimType::BarnesHutParallel => return (particles, barneshut::stepsim_par),
+        config::SimType::Classical => return (particles, physics::stepsim),
     }
 }
 
 fn animate(mut particles: Vec<Particle>, stepfn: fn(&mut Vec<Particle>), display: Display ) {
-    let renderer = get_renderer(display);
-    renderer.clear();
-    let mut framect = 0u;
+    let sdl_context = sdl2::init(sdl2::INIT_VIDEO).unwrap();
+    let mut renderer = get_renderer(&sdl_context, display);
+    let mut drawer = renderer.drawer();
+    let mut framect = 0;
     let starttime = time::precise_time_s();
-    loop {
-        renderer.clear();
+    let mut event_pump = sdl_context.event_pump();
+    'outer: loop {
+        drawer.clear();
         stepfn(&mut particles);
         let points = pcls2points(&particles, display);
-        renderer.draw_points(points.as_slice());
-        renderer.present();
+        drawer.draw_points(&points);
+        drawer.present();
         framect += 1;
-        match sdl2::event::poll_event() {
-            sdl2::event::QuitEvent(_) => break,
-            sdl2::event::KeyDownEvent(_, _, key, _, _) => {
-                if key == sdl2::keycode::EscapeKey {
-                    break
+        for event in event_pump.poll_iter() {
+            match event {
+                sdl2::event::Event::Quit{..} => break 'outer,
+                sdl2::event::Event::KeyDown { keycode:key, .. } => {
+                    if key == sdl2::keycode::KeyCode::Escape {
+                        break 'outer
+                    }
                 }
+                _ => {}
             }
-            _ => {}
         }
     }
     let endtime = time::precise_time_s();
-    sdl2::quit();
     println!("Avg FPS: {}", framect as f64 / (endtime - starttime) as f64)
 }
 
-fn get_renderer(display: Display) -> sdl2::render::Renderer<sdl2::video::Window> {
-    sdl2::render::Renderer::new_with_window(display.width as int, display.height as int, sdl2::video::FullscreenDesktop).unwrap()
+fn get_renderer<'a>(_sdl: &sdl2::Sdl, display: Display) -> sdl2::render::Renderer<'a> {
+    sdl2::render::Renderer::new_with_window(_sdl, display.width, display.height, sdl2::video::FULLSCREEN).unwrap()
 }
 
 // ******* Configuration ******* //
 
 fn configure(path: &str) -> Config {
-    let cfgstr = File::open(&Path::new(path)).read_to_str().unwrap();
-    let cfgtbl = toml::Parser::new(cfgstr.as_slice()).parse().unwrap();
-    let cfg: ConfigOpt = toml::decode(toml::Table(cfgtbl)).unwrap();
+    let mut cfgstr = String::new();
+    File::open(&Path::new(path)).unwrap().read_to_string(&mut cfgstr);
+    let cfgtbl = toml::Parser::new(&cfgstr).parse().unwrap();
+    let cfg: ConfigOpt = toml::decode(toml::Value::Table(cfgtbl)).unwrap();
 
-    let defaultstr = File::open(&Path::new("config/default.toml")).read_to_str().unwrap();
-    let default_tbl = toml::Parser::new(defaultstr.as_slice()).parse().unwrap();
-    let default: Config = toml::decode(toml::Table(default_tbl)).unwrap();
+    let mut defaultstr = String::new();
+    File::open(&Path::new("config/default.toml")).unwrap().read_to_string(&mut defaultstr);
+    let default_tbl = toml::Parser::new(&defaultstr).parse().unwrap();
+    let default: Config = toml::decode(toml::Value::Table(default_tbl)).unwrap();
+    println!("{:?}", default);
     default
 }
 
 fn opts() -> String {
-    let args: Vec<String> = std::os::args().iter().map(|x| x.to_string()).collect(); 
-    let opts = [
-        getopts::optopt("c", "config", "Configuration file", "PATH")
-        ];
-    let matches = match getopts::getopts(args.tail(), opts) {
+    let args: Vec<String> = std::env::args().map(|x| x.to_string()).collect(); 
+    let mut opts = getopts::Options::new();
+    opts.optopt("c", "config", "Configuration file", "PATH");
+    let matches = match opts.parse(args.tail()) {
         Ok(m) => m,
-        Err(f) => fail!(f.to_str())
+        Err(f) => panic!("{}", f)
     };
     match matches.opt_str("c") {
         Some(c) => return c,
@@ -98,7 +109,7 @@ fn opts() -> String {
 
 fn main() {
     let pathstr = opts();
-    let cfg = configure(pathstr.as_slice());
+    let cfg = configure(&pathstr);
     unsafe {barneshut::THRESH = cfg.threshold};
     unsafe {physics::DT = cfg.dt};
     let (particles, stepfn) = init_particles(&cfg);
